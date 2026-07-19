@@ -4,23 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA 預測計分板</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2230%22%20fill%3D%22%2314283d%22/%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2230%22%20fill%3D%22none%22%20stroke%3D%22%234ecac1%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%222%22/%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2223%22%20fill%3D%22%23e8833a%22/%3E%3Cpath%20d%3D%22M9%2032h46M32%209v46M14%2015a24%2024%200%20010%2034M50%2015a24%2024%200%20000%2034%22%20stroke%3D%22%230c1a2b%22%20stroke-width%3D%222.2%22%20fill%3D%22none%22/%3E%3Cpolyline%20points%3D%2222%2C41%2029%2C33%2034%2C36%2043%2C24%22%20fill%3D%22none%22%20stroke%3D%22%230c1a2b%22%20stroke-width%3D%224.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3Cpolyline%20points%3D%2222%2C41%2029%2C33%2034%2C36%2043%2C24%22%20fill%3D%22none%22%20stroke%3D%22%232aa79e%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3Ccircle%20cx%3D%2243%22%20cy%3D%2224%22%20r%3D%223.4%22%20fill%3D%22%23ffc247%22/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2230%22%20fill%3D%22%231e1726%22/%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2230%22%20fill%3D%22none%22%20stroke%3D%22%236fb7ff%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%222%22/%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2223%22%20fill%3D%22%23e8833a%22/%3E%3Cpath%20d%3D%22M9%2032h46M32%209v46M14%2015a24%2024%200%20010%2034M50%2015a24%2024%200%20000%2034%22%20stroke%3D%22%230c1a2b%22%20stroke-width%3D%222.2%22%20fill%3D%22none%22/%3E%3Cpolyline%20points%3D%2222%2C41%2029%2C33%2034%2C36%2043%2C24%22%20fill%3D%22none%22%20stroke%3D%22%230c1a2b%22%20stroke-width%3D%224.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3Cpolyline%20points%3D%2222%2C41%2029%2C33%2034%2C36%2043%2C24%22%20fill%3D%22none%22%20stroke%3D%22%236fb7ff%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3Ccircle%20cx%3D%2243%22%20cy%3D%2224%22%20r%3D%223.4%22%20fill%3D%22%23ff9f43%22/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --field:#0c1a2b; --panel:#14283d; --panel-2:#1a3149;
-    --line:rgba(226,236,232,.14); --chalk:#eef4f1; --muted:#8299ac;
-    --wash:rgba(255,255,255,.07); --wash2:rgba(255,255,255,.13); --ink2:#d6e0da; --btn-ink:#0c1a2b;
-    --amber:#ffc247; --teal:#4ecac1; --hit:#46c46a; --miss:#ef5f5f; --grow:#7ec96f;
+    --field:#141019; --panel:#1e1726; --panel-2:#261d31;
+    --line:rgba(240,232,246,.14); --chalk:#f2eef7; --muted:#9a8fae;
+    --wash:rgba(255,255,255,.07); --wash2:rgba(255,255,255,.13); --ink2:#ded4e8; --btn-ink:#141019;
+    --amber:#ff9f43; --teal:#6fb7ff; --hit:#46c46a; --miss:#ef5f5f; --grow:#7ec96f;
     --mono:'IBM Plex Mono',ui-monospace,monospace;
     --cond:'Barlow Condensed',sans-serif; --body:'Noto Sans TC',sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{
-    background:radial-gradient(1200px 600px at 50% -10%, var(--glow-top,#163150) 0%, transparent 60%), var(--field);
+    background:radial-gradient(1200px 600px at 50% -10%, var(--glow-top,#2a1f3d) 0%, transparent 60%), var(--field);
     transition:background 1s ease;
     color:var(--chalk); font-family:var(--body); line-height:1.6; min-height:100vh;
     padding:clamp(16px,4vw,40px) clamp(14px,4vw,28px) 60px;
@@ -281,7 +281,7 @@
 <div class="wrap">
   <header>
     <div class="eyebrow">Daily Basketball Model · 點隊名看名單 · 可搜尋球員</div>
-    <h1 id="homeLink"><svg class="sitelogo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#14283d"/><circle cx="32" cy="32" r="30" fill="none" stroke="#4ecac1" stroke-opacity=".35" stroke-width="2"/><circle cx="32" cy="32" r="23" fill="#e8833a"/><path d="M9 32h46M32 9v46M14 15a24 24 0 010 34M50 15a24 24 0 000 34" stroke="#0c1a2b" stroke-width="2.2" fill="none"/><polyline points="22,41 29,33 34,36 43,24" fill="none" stroke="#0c1a2b" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><polyline points="22,41 29,33 34,36 43,24" fill="none" stroke="#2aa79e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="43" cy="24" r="3.4" fill="#ffc247"/></svg><span>NBA 預測計分板</span></h1>
+    <h1 id="homeLink"><svg class="sitelogo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#1e1726"/><circle cx="32" cy="32" r="30" fill="none" stroke="#6fb7ff" stroke-opacity=".35" stroke-width="2"/><circle cx="32" cy="32" r="23" fill="#e8833a"/><path d="M9 32h46M32 9v46M14 15a24 24 0 010 34M50 15a24 24 0 000 34" stroke="#0c1a2b" stroke-width="2.2" fill="none"/><polyline points="22,41 29,33 34,36 43,24" fill="none" stroke="#0c1a2b" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><polyline points="22,41 29,33 34,36 43,24" fill="none" stroke="#6fb7ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="43" cy="24" r="3.4" fill="#ff9f43"/></svg><span>NBA 預測計分板</span></h1>
 
     <div class="searchbar">
       <input type="text" id="searchBox" placeholder="搜尋球員(輸入英文姓名,例如 Curry、LeBron…)">
@@ -1532,14 +1532,18 @@ $('stBackBtn').addEventListener('click',()=>history.back());
 
 /* ---------- 背景主題(動畫粒子) ---------- */
 const THEMES=[
-  {id:'night',emoji:'🌙',name:'夜場經典',pal:{field:'#0c1a2b',panel:'#14283d',panel2:'#1a3149',glow:'#163150',amber:'#ffc247',teal:'#4ecac1',chalk:'#eef4f1',muted:'#8299ac',line:'rgba(226,236,232,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#d6e0da',btnInk:'#0c1a2b'}},
-  {id:'fireworks',emoji:'🎆',name:'滿貫煙火',pal:{field:'#0a1020',panel:'#131c33',panel2:'#182342',glow:'#1a2a55',amber:'#ffcf5c',teal:'#7ab8ff',chalk:'#eef4f1',muted:'#8299ac',line:'rgba(226,236,232,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#d6e0da',btnInk:'#0c1a2b'}},
-  {id:'dusk',emoji:'🌇',name:'黃昏開球',pal:{field:'#1d1226',panel:'#2b1b33',panel2:'#35213d',glow:'#5a2b3f',amber:'#ffd27d',teal:'#ffab76',chalk:'#eef4f1',muted:'#8299ac',line:'rgba(226,236,232,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#d6e0da',btnInk:'#0c1a2b'}},
-  {id:'storm',emoji:'⛈️',name:'雷雨延賽',pal:{field:'#0b1119',panel:'#141d29',panel2:'#1a2533',glow:'#22303f',amber:'#ffe08a',teal:'#7fd4e8',chalk:'#eef4f1',muted:'#8299ac',line:'rgba(226,236,232,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#d6e0da',btnInk:'#0c1a2b'}},
-  {id:'neon',emoji:'🌆',name:'霓虹球場',pal:{field:'#0d0a1a',panel:'#171130',panel2:'#1e1740',glow:'#2a1458',amber:'#ff6ec7',teal:'#00e5ff',chalk:'#eef4f1',muted:'#8299ac',line:'rgba(226,236,232,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#d6e0da',btnInk:'#0c1a2b'}},
-  {id:'daysky',emoji:'☀️',name:'日場藍天',light:true,pal:{field:'#d8e9f7',panel:'#ffffff',panel2:'#edf5fc',glow:'#b7d8f2',amber:'#d97706',teal:'#0f766e',chalk:'#12283a',muted:'#5b7286',line:'rgba(18,40,58,.16)',wash:'rgba(18,40,58,.06)',wash2:'rgba(18,40,58,.13)',ink2:'#2c3e4a',btnInk:'#ffffff'}},
-  {id:'grass',emoji:'🌿',name:'綠茵日場',light:true,pal:{field:'#e7efdb',panel:'#ffffff',panel2:'#f2f7e9',glow:'#cbe2b4',amber:'#b45309',teal:'#15803d',chalk:'#1e2c1a',muted:'#5c6f56',line:'rgba(30,44,26,.16)',wash:'rgba(30,44,26,.06)',wash2:'rgba(30,44,26,.13)',ink2:'#33422e',btnInk:'#ffffff'}},
-  {id:'cream',emoji:'🧢',name:'復古奶油',light:true,pal:{field:'#f4ecdd',panel:'#fffdf6',panel2:'#f6f0e2',glow:'#e9d5b0',amber:'#c2410c',teal:'#0e7490',chalk:'#33261a',muted:'#77664f',line:'rgba(51,38,26,.16)',wash:'rgba(51,38,26,.06)',wash2:'rgba(51,38,26,.13)',ink2:'#4a3a29',btnInk:'#ffffff'}}];
+  {id:'night',emoji:'🏀',name:'開賽之夜',pal:{field:'#141019',panel:'#1e1726',panel2:'#261d31',glow:'#2a1f3d',amber:'#ff9f43',teal:'#6fb7ff',chalk:'#f2eef7',muted:'#9a8fae',line:'rgba(240,232,246,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#ded4e8',btnInk:'#141019'}},
+  {id:'fireworks',emoji:'🏆',name:'冠軍金雨',pal:{field:'#0d0b07',panel:'#17130a',panel2:'#1f1a0e',glow:'#2b2210',amber:'#ffd54a',teal:'#e6c15c',chalk:'#f5efe0',muted:'#a3987d',line:'rgba(245,239,224,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#e4dcc6',btnInk:'#0d0b07'}},
+  {id:'dusk',emoji:'👑',name:'紫金王朝',pal:{field:'#170f2b',panel:'#221740',panel2:'#2b1d50',glow:'#3b2766',amber:'#ffd54a',teal:'#b18cff',chalk:'#f2eefb',muted:'#9d92bd',line:'rgba(242,238,251,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#ddd3f0',btnInk:'#170f2b'}},
+  {id:'storm',emoji:'📸',name:'季後賽聲浪',pal:{field:'#0b0e14',panel:'#151a24',panel2:'#1b2230',glow:'#232c3d',amber:'#ffb03a',teal:'#7fd4e8',chalk:'#eef2f7',muted:'#8b98ab',line:'rgba(238,242,247,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#d8dfe8',btnInk:'#0b0e14'}},
+  {id:'neon',emoji:'🌃',name:'街頭夜場',pal:{field:'#0a0a0d',panel:'#141317',panel2:'#1b191f',glow:'#26202b',amber:'#ff8a3c',teal:'#4dc4ff',chalk:'#f1eff4',muted:'#94909e',line:'rgba(241,239,244,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dcd8e2',btnInk:'#0a0a0d'}},
+  {id:'daysky',emoji:'🏟️',name:'午間球館',light:true,pal:{field:'#dde7f2',panel:'#ffffff',panel2:'#eef3fa',glow:'#c2d6ec',amber:'#e8630a',teal:'#0b6bb5',chalk:'#16232f',muted:'#5b6d80',line:'rgba(22,35,47,.16)',wash:'rgba(22,35,47,.06)',wash2:'rgba(22,35,47,.13)',ink2:'#2e3d4a',btnInk:'#ffffff'}},
+  {id:'grass',emoji:'☘️',name:'綠衫花園',light:true,pal:{field:'#e4efe2',panel:'#ffffff',panel2:'#f0f7ee',glow:'#c4e0bf',amber:'#b45309',teal:'#0f7a3d',chalk:'#182a1c',muted:'#587055',line:'rgba(24,42,28,.16)',wash:'rgba(24,42,28,.06)',wash2:'rgba(24,42,28,.13)',ink2:'#2f4433',btnInk:'#ffffff'}},
+  {id:'cream',emoji:'🪵',name:'復古硬木',light:true,pal:{field:'#f2e3c9',panel:'#fffaf0',panel2:'#f6ecd8',glow:'#e3c493',amber:'#c2410c',teal:'#8a5a2b',chalk:'#33251a',muted:'#7c6448',line:'rgba(51,37,26,.16)',wash:'rgba(51,37,26,.06)',wash2:'rgba(51,37,26,.13)',ink2:'#4c3a28',btnInk:'#ffffff'}},
+  {id:'sunrise',emoji:'☀️',name:'破曉白金',light:true,pal:{field:'#fdf3e4',panel:'#fffdf8',panel2:'#faeeda',glow:'#f5d9ae',amber:'#ea580c',teal:'#b45309',chalk:'#3a2a1c',muted:'#8a7156',line:'rgba(58,42,28,.15)',wash:'rgba(58,42,28,.06)',wash2:'rgba(58,42,28,.12)',ink2:'#54402c',btnInk:'#ffffff'}},
+  {id:'lemon',emoji:'🍋',name:'檸檬快攻',light:true,pal:{field:'#faf6d9',panel:'#fffef4',panel2:'#f6f1cf',glow:'#efe3a0',amber:'#ca8a04',teal:'#4d7c0f',chalk:'#31300f',muted:'#7d7a4a',line:'rgba(49,48,15,.15)',wash:'rgba(49,48,15,.06)',wash2:'rgba(49,48,15,.12)',ink2:'#4a481f',btnInk:'#ffffff'}},
+  {id:'sakura',emoji:'🌸',name:'櫻花球季',light:true,pal:{field:'#fbeaf0',panel:'#fffafc',panel2:'#f8e2ea',glow:'#f3c6d6',amber:'#db2777',teal:'#9d5b8b',chalk:'#3c2230',muted:'#8f6b7d',line:'rgba(60,34,48,.15)',wash:'rgba(60,34,48,.06)',wash2:'rgba(60,34,48,.12)',ink2:'#573445',btnInk:'#ffffff'}},
+  {id:'ice',emoji:'🧊',name:'冰藍主場',light:true,pal:{field:'#e8f4fa',panel:'#ffffff',panel2:'#ddeef7',glow:'#bcdcef',amber:'#0369a1',teal:'#0e7490',chalk:'#122733',muted:'#54707f',line:'rgba(18,39,51,.16)',wash:'rgba(18,39,51,.06)',wash2:'rgba(18,39,51,.12)',ink2:'#28414f',btnInk:'#ffffff'}}];
 let fxTheme=localStorage.getItem('nba_theme')||'night';
 if(!THEMES.some(t=>t.id===fxTheme))fxTheme='night';
 const fxCanvas=document.getElementById('fx');
@@ -1550,28 +1554,30 @@ function fxResize(){fxCanvas.width=innerWidth;fxCanvas.height=innerHeight;}
 addEventListener('resize',fxResize);fxResize();
 function rnd(a,b){return a+Math.random()*(b-a);}
 
+const FX_ALIAS={sunrise:'cream',lemon:'dusk',sakura:'daysky',ice:'daysky'};
+const fxEff=()=>FX_ALIAS[fxTheme]||fxTheme;
 let rockets=[],sparks=[],rocketT=0,flashT=0,flashNext=0,streak=null,streakT=0;
-const FW_COLORS=['255,207,92','122,184,255','255,143,163','170,255,190','230,190,255'];
+const FW_COLORS=['255,213,74','255,180,60','255,236,150','240,193,90','255,150,80'];
 function fxInit(){
   fxParts=[];rockets=[];sparks=[];rocketT=0;flashT=0;flashNext=rnd(3,7);streak=null;streakT=rnd(4,8);
   const n=Math.min(90,Math.round(innerWidth*innerHeight/16000));
-  if(fxTheme==='dusk'){
+  if(fxEff()==='dusk'){
     for(let i=0;i<n;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
       r:rnd(1,3.2),vx:rnd(4,14),vy:-rnd(2,8),o:rnd(.1,.38),tw:rnd(0,6.28)});
-  }else if(fxTheme==='storm'){
+  }else if(fxEff()==='storm'){
     for(let i=0;i<n*1.6;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
       vy:rnd(560,920),vx:-rnd(30,80),o:rnd(.1,.28)});
-  }else if(fxTheme==='neon'){
+  }else if(fxEff()==='neon'){
     for(let i=0;i<n*.8;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
       r:rnd(1.5,4),vx:rnd(-10,10),vy:rnd(-6,6),o:rnd(.12,.4),
-      c:Math.random()<.5?'255,110,199':'0,229,255',tw:rnd(0,6.28)});
-  }else if(fxTheme==='daysky'){
+      c:Math.random()<.5?'255,138,60':'77,196,255',tw:rnd(0,6.28)});
+  }else if(fxEff()==='daysky'){
     for(let i=0;i<Math.max(5,n*0.16);i++)fxParts.push({x:rnd(-80,innerWidth),y:rnd(20,innerHeight*.55),
       s:rnd(.6,1.7),v:rnd(7,18),o:rnd(.3,.5)});
-  }else if(fxTheme==='grass'){
+  }else if(fxEff()==='grass'){
     for(let i=0;i<n*0.8;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
       r:rnd(1.2,2.6),vx:rnd(-6,6),vy:-rnd(6,16),o:rnd(.18,.45),tw:rnd(0,6.28)});
-  }else if(fxTheme==='cream'){
+  }else if(fxEff()==='cream'){
     for(let i=0;i<n*0.7;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
       r:rnd(1,3),vx:rnd(4,12),vy:-rnd(2,7),o:rnd(.12,.35),tw:rnd(0,6.28)});
   }
@@ -1580,7 +1586,7 @@ function fxTick(t){
   const dt=Math.min(.05,(t-fxLast)/1000||.016);fxLast=t;
   const W=fxCanvas.width,H=fxCanvas.height;
   fxCtx.clearRect(0,0,W,H);
-  if(fxTheme==='fireworks'){
+  if(fxEff()==='fireworks'){
     rocketT-=dt;
     if(rocketT<=0){rockets.push({x:rnd(W*.15,W*.85),y:H+8,vy:-rnd(H*.55,H*.8),
       ty:rnd(H*.18,H*.42),c:FW_COLORS[Math.floor(rnd(0,FW_COLORS.length))]});rocketT=rnd(1.6,3.6);}
@@ -1607,22 +1613,22 @@ function fxTick(t){
       fxCtx.beginPath();fxCtx.arc(s.x,s.y,1.6,0,6.28);fxCtx.fill();
       return true;
     });
-  }else if(fxTheme==='dusk'){
+  }else if(fxEff()==='dusk'){
     fxParts.forEach(p=>{
       p.tw+=dt*1.5;p.x+=p.vx*dt;p.y+=p.vy*dt;
       if(p.x>W+8)p.x=-8;if(p.y<-8){p.y=H+8;p.x=rnd(0,W);}
       const o=p.o*(0.65+0.35*Math.sin(p.tw));
       const g=fxCtx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
-      g.addColorStop(0,`rgba(255,190,120,${o})`);g.addColorStop(1,'rgba(255,190,120,0)');
+      g.addColorStop(0,`rgba(255,205,90,${o})`);g.addColorStop(1,'rgba(255,205,90,0)');
       fxCtx.fillStyle=g;fxCtx.beginPath();fxCtx.arc(p.x,p.y,p.r*3,0,6.28);fxCtx.fill();
     });
-  }else if(fxTheme==='storm'){
-    fxCtx.strokeStyle='rgba(170,200,230,.001)';
+  }else if(fxEff()==='storm'){
+    fxCtx.strokeStyle='rgba(255,170,80,.001)';
     fxParts.forEach(p=>{
       p.y+=p.vy*dt;p.x+=p.vx*dt;
       if(p.y>H+20){p.y=-20;p.x=rnd(0,W+80);}
       const len=p.vy*.022;
-      fxCtx.strokeStyle=`rgba(170,200,230,${p.o})`;fxCtx.lineWidth=1;
+      fxCtx.strokeStyle=`rgba(255,170,80,${p.o})`;fxCtx.lineWidth=1;
       fxCtx.beginPath();fxCtx.moveTo(p.x,p.y);fxCtx.lineTo(p.x+p.vx*.02,p.y+len);fxCtx.stroke();
     });
     flashNext-=dt;
@@ -1634,7 +1640,7 @@ function fxTick(t){
       const o=Math.min(.22,.22*pr*flick);
       fxCtx.fillStyle=`rgba(215,230,255,${o})`;fxCtx.fillRect(0,0,W,H);
     }
-  }else if(fxTheme==='neon'){
+  }else if(fxEff()==='neon'){
     fxParts.forEach(p=>{
       p.tw+=dt*2.2;p.x+=p.vx*dt;p.y+=p.vy*dt;
       if(p.x<-10)p.x=W+10;if(p.x>W+10)p.x=-10;
@@ -1646,7 +1652,7 @@ function fxTick(t){
     });
     streakT-=dt;
     if(streakT<=0&&!streak){streak={x:-W*.2,y:rnd(H*.15,H*.85),v:rnd(W*.9,W*1.4),
-      c:Math.random()<.5?'255,110,199':'0,229,255'};streakT=rnd(5,9);}
+      c:Math.random()<.5?'255,138,60':'77,196,255'};streakT=rnd(5,9);}
     if(streak){
       streak.x+=streak.v*dt;
       const g=fxCtx.createLinearGradient(streak.x-W*.18,streak.y,streak.x,streak.y);
@@ -1655,7 +1661,7 @@ function fxTick(t){
       fxCtx.beginPath();fxCtx.moveTo(streak.x-W*.18,streak.y);fxCtx.lineTo(streak.x,streak.y);fxCtx.stroke();
       if(streak.x-W*.18>W)streak=null;
     }
-  }else if(fxTheme==='daysky'){
+  }else if(fxEff()==='daysky'){
     fxParts.forEach(p=>{
       p.x+=p.v*dt;
       if(p.x-90*p.s>W){p.x=-90*p.s;p.y=rnd(20,H*.55);}
@@ -1663,7 +1669,7 @@ function fxTick(t){
       const e=(cx,cy,rx,ry)=>{fxCtx.beginPath();fxCtx.ellipse(cx,cy,rx,ry,0,0,6.28);fxCtx.fill();};
       e(p.x,p.y,44*p.s,15*p.s);e(p.x-27*p.s,p.y+7*p.s,27*p.s,11*p.s);e(p.x+28*p.s,p.y+7*p.s,30*p.s,12*p.s);
     });
-  }else if(fxTheme==='grass'){
+  }else if(fxEff()==='grass'){
     fxParts.forEach(p=>{
       p.tw+=dt*1.8;p.x+=(p.vx+Math.sin(p.tw)*6)*dt;p.y+=p.vy*dt;
       if(p.y<-8){p.y=H+8;p.x=rnd(0,W);}
@@ -1671,7 +1677,7 @@ function fxTick(t){
       fxCtx.fillStyle=`rgba(120,160,60,${o})`;
       fxCtx.beginPath();fxCtx.arc(p.x,p.y,p.r,0,6.28);fxCtx.fill();
     });
-  }else if(fxTheme==='cream'){
+  }else if(fxEff()==='cream'){
     fxParts.forEach(p=>{
       p.tw+=dt*1.4;p.x+=p.vx*dt;p.y+=p.vy*dt;
       if(p.x>W+8)p.x=-8;if(p.y<-8){p.y=H+8;p.x=rnd(0,W);}
