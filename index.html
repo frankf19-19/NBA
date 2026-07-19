@@ -265,6 +265,8 @@
   #themeBar{display:flex;align-items:center;gap:7px;margin-top:12px;position:relative;flex-wrap:wrap}
   .theme-b{font-size:16px;line-height:1;background:var(--wash);border:1px solid var(--line);
     border-radius:999px;width:34px;height:34px;cursor:pointer;transition:transform .12s,border-color .12s}
+  .theme-b.tb-abbr{width:auto;min-width:40px;padding:0 8px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--ink2)}
+  .theme-b.tb-abbr.on{color:var(--amber)}
   .theme-b:hover{transform:translateY(-1px)}
   .theme-b.on{border-color:var(--amber);box-shadow:0 0 10px rgba(255,194,71,.3)}
   .empty{color:var(--muted);border:1px dashed var(--line);border-radius:10px;padding:22px;text-align:center;font-size:14.5px}
@@ -1532,20 +1534,40 @@ $('stBackBtn').addEventListener('click',()=>history.back());
 
 /* ---------- 背景主題(動畫粒子) ---------- */
 const THEMES=[
-  {id:'night',emoji:'🏀',name:'開賽之夜',pal:{field:'#141019',panel:'#1e1726',panel2:'#261d31',glow:'#2a1f3d',amber:'#ff9f43',teal:'#6fb7ff',chalk:'#f2eef7',muted:'#9a8fae',line:'rgba(240,232,246,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#ded4e8',btnInk:'#141019'}},
-  {id:'fireworks',emoji:'🏆',name:'冠軍金雨',pal:{field:'#0d0b07',panel:'#17130a',panel2:'#1f1a0e',glow:'#2b2210',amber:'#ffd54a',teal:'#e6c15c',chalk:'#f5efe0',muted:'#a3987d',line:'rgba(245,239,224,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#e4dcc6',btnInk:'#0d0b07'}},
-  {id:'dusk',emoji:'👑',name:'紫金王朝',pal:{field:'#170f2b',panel:'#221740',panel2:'#2b1d50',glow:'#3b2766',amber:'#ffd54a',teal:'#b18cff',chalk:'#f2eefb',muted:'#9d92bd',line:'rgba(242,238,251,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#ddd3f0',btnInk:'#170f2b'}},
-  {id:'storm',emoji:'📸',name:'季後賽聲浪',pal:{field:'#0b0e14',panel:'#151a24',panel2:'#1b2230',glow:'#232c3d',amber:'#ffb03a',teal:'#7fd4e8',chalk:'#eef2f7',muted:'#8b98ab',line:'rgba(238,242,247,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#d8dfe8',btnInk:'#0b0e14'}},
-  {id:'neon',emoji:'🌃',name:'街頭夜場',pal:{field:'#0a0a0d',panel:'#141317',panel2:'#1b191f',glow:'#26202b',amber:'#ff8a3c',teal:'#4dc4ff',chalk:'#f1eff4',muted:'#94909e',line:'rgba(241,239,244,.14)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dcd8e2',btnInk:'#0a0a0d'}},
-  {id:'daysky',emoji:'🏟️',name:'午間球館',light:true,pal:{field:'#dde7f2',panel:'#ffffff',panel2:'#eef3fa',glow:'#c2d6ec',amber:'#e8630a',teal:'#0b6bb5',chalk:'#16232f',muted:'#5b6d80',line:'rgba(22,35,47,.16)',wash:'rgba(22,35,47,.06)',wash2:'rgba(22,35,47,.13)',ink2:'#2e3d4a',btnInk:'#ffffff'}},
-  {id:'grass',emoji:'☘️',name:'綠衫花園',light:true,pal:{field:'#e4efe2',panel:'#ffffff',panel2:'#f0f7ee',glow:'#c4e0bf',amber:'#b45309',teal:'#0f7a3d',chalk:'#182a1c',muted:'#587055',line:'rgba(24,42,28,.16)',wash:'rgba(24,42,28,.06)',wash2:'rgba(24,42,28,.13)',ink2:'#2f4433',btnInk:'#ffffff'}},
-  {id:'cream',emoji:'🪵',name:'復古硬木',light:true,pal:{field:'#f2e3c9',panel:'#fffaf0',panel2:'#f6ecd8',glow:'#e3c493',amber:'#c2410c',teal:'#8a5a2b',chalk:'#33251a',muted:'#7c6448',line:'rgba(51,37,26,.16)',wash:'rgba(51,37,26,.06)',wash2:'rgba(51,37,26,.13)',ink2:'#4c3a28',btnInk:'#ffffff'}},
-  {id:'sunrise',emoji:'☀️',name:'破曉白金',light:true,pal:{field:'#fdf3e4',panel:'#fffdf8',panel2:'#faeeda',glow:'#f5d9ae',amber:'#ea580c',teal:'#b45309',chalk:'#3a2a1c',muted:'#8a7156',line:'rgba(58,42,28,.15)',wash:'rgba(58,42,28,.06)',wash2:'rgba(58,42,28,.12)',ink2:'#54402c',btnInk:'#ffffff'}},
-  {id:'lemon',emoji:'🍋',name:'檸檬快攻',light:true,pal:{field:'#faf6d9',panel:'#fffef4',panel2:'#f6f1cf',glow:'#efe3a0',amber:'#ca8a04',teal:'#4d7c0f',chalk:'#31300f',muted:'#7d7a4a',line:'rgba(49,48,15,.15)',wash:'rgba(49,48,15,.06)',wash2:'rgba(49,48,15,.12)',ink2:'#4a481f',btnInk:'#ffffff'}},
-  {id:'sakura',emoji:'🌸',name:'櫻花球季',light:true,pal:{field:'#fbeaf0',panel:'#fffafc',panel2:'#f8e2ea',glow:'#f3c6d6',amber:'#db2777',teal:'#9d5b8b',chalk:'#3c2230',muted:'#8f6b7d',line:'rgba(60,34,48,.15)',wash:'rgba(60,34,48,.06)',wash2:'rgba(60,34,48,.12)',ink2:'#573445',btnInk:'#ffffff'}},
-  {id:'ice',emoji:'🧊',name:'冰藍主場',light:true,pal:{field:'#e8f4fa',panel:'#ffffff',panel2:'#ddeef7',glow:'#bcdcef',amber:'#0369a1',teal:'#0e7490',chalk:'#122733',muted:'#54707f',line:'rgba(18,39,51,.16)',wash:'rgba(18,39,51,.06)',wash2:'rgba(18,39,51,.12)',ink2:'#28414f',btnInk:'#ffffff'}}];
-let fxTheme=localStorage.getItem('nba_theme')||'night';
-if(!THEMES.some(t=>t.id===fxTheme))fxTheme='night';
+  {id:'nba',abbr:'NBA',name:'NBA 官方',pal:{field:'#0b1121',panel:'#111b33',panel2:'#15223f',glow:'#112650',amber:'#df7284',teal:'#92a3c7',chalk:'#e9ebf2',muted:'#848ea6',line:'rgba(233,235,242,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dbdce4',btnInk:'#0b1121'},palL:{field:'#e8ecf3',panel:'#ffffff',panel2:'#f1f4f8',glow:'#a9b7d3',amber:'#c8102e',teal:'#1d428a',chalk:'#141b2b',muted:'#4d5b7c',line:'rgba(20,27,43,.16)',wash:'rgba(20,27,43,.06)',wash2:'rgba(20,27,43,.12)',ink2:'#232735',btnInk:'#ffffff'}},
+  {id:'ATL',abbr:'ATL',name:'亞特蘭大老鷹',pal:{field:'#2b1015',panel:'#44191f',panel2:'#571f26',glow:'#822224',amber:'#c1d32f',teal:'#ec898c',chalk:'#f3ebee',muted:'#b4868d',line:'rgba(243,235,238,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#e0dce2',btnInk:'#2b1015'},palL:{field:'#fcebec',panel:'#ffffff',panel2:'#fdf3f3',glow:'#f3b4b6',amber:'#5d6516',teal:'#ca3438',chalk:'#37191d',muted:'#97585f',line:'rgba(55,25,29,.16)',wash:'rgba(55,25,29,.06)',wash2:'rgba(55,25,29,.12)',ink2:'#38262d',btnInk:'#ffffff'}},
+  {id:'BKN',abbr:'BKN',name:'布魯克林籃網',pal:{field:'#0e0e12',panel:'#15151b',panel2:'#1a1a20',glow:'#19191b',amber:'#e8e8e8',teal:'#a2a2a3',chalk:'#eaeaed',muted:'#8d8d94',line:'rgba(234,234,237,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dbdbe2',btnInk:'#0e0e12'},palL:{field:'#eaeaea',panel:'#ffffff',panel2:'#f2f2f2',glow:'#aeaeb0',amber:'#2b2b2e',teal:'#2b2b2e',chalk:'#16161a',muted:'#525259',line:'rgba(22,22,26,.16)',wash:'rgba(22,22,26,.06)',wash2:'rgba(22,22,26,.12)',ink2:'#24242b',btnInk:'#ffffff'}},
+  {id:'BOS',abbr:'BOS',name:'波士頓塞爾提克',pal:{field:'#071a13',panel:'#0a291c',panel2:'#0b3522',glow:'#00471e',amber:'#ba9653',teal:'#76b892',chalk:'#e8eeed',muted:'#76988a',line:'rgba(232,238,237,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadde2',btnInk:'#071a13'},palL:{field:'#e6f2eb',panel:'#ffffff',panel2:'#f0f7f3',glow:'#9eccb1',amber:'#7a6337',teal:'#007a33',chalk:'#0f251b',muted:'#42705b',line:'rgba(15,37,27,.16)',wash:'rgba(15,37,27,.06)',wash2:'rgba(15,37,27,.12)',ink2:'#202d2b',btnInk:'#ffffff'}},
+  {id:'CHA',abbr:'CHA',name:'夏洛特黃蜂',pal:{field:'#0b091a',panel:'#110e28',panel2:'#151131',glow:'#110a38',amber:'#469dab',teal:'#a7a2c1',chalk:'#e9e9ef',muted:'#8f8ca3',line:'rgba(233,233,239,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dbdbe3',btnInk:'#0b091a'},palL:{field:'#e8e7ef',panel:'#ffffff',panel2:'#f1f1f5',glow:'#a9a5c3',amber:'#00788c',teal:'#1d1160',chalk:'#141223',muted:'#4d486c',line:'rgba(20,18,35,.16)',wash:'rgba(20,18,35,.06)',wash2:'rgba(20,18,35,.12)',ink2:'#232230',btnInk:'#ffffff'}},
+  {id:'CHI',abbr:'CHI',name:'芝加哥公牛',pal:{field:'#280915',panel:'#3f0e20',panel2:'#511127',glow:'#770a26',amber:'#ff8a8a',teal:'#e88da3',chalk:'#f2e9ee',muted:'#b28798',line:'rgba(242,233,238,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#e0dbe2',btnInk:'#280915'},palL:{field:'#fae7ec',panel:'#ffffff',panel2:'#fcf1f4',glow:'#eca5b7',amber:'#965252',teal:'#ce1141',chalk:'#34121e',muted:'#904861',line:'rgba(52,18,30,.16)',wash:'rgba(52,18,30,.06)',wash2:'rgba(52,18,30,.12)',ink2:'#36222d',btnInk:'#ffffff'}},
+  {id:'CLE',abbr:'CLE',name:'克里夫蘭騎士',pal:{field:'#1c0714',panel:'#2c0a1d',panel2:'#390b24',glow:'#4e0020',amber:'#fdbb30',teal:'#ca90a9',chalk:'#eee8ed',muted:'#a4899b',line:'rgba(238,232,237,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dddae2',btnInk:'#1c0714'},palL:{field:'#f3e6eb',panel:'#ffffff',panel2:'#f8f0f3',glow:'#d19eb3',amber:'#86631a',teal:'#860038',chalk:'#270f1c',muted:'#75425d',line:'rgba(39,15,28,.16)',wash:'rgba(39,15,28,.06)',wash2:'rgba(39,15,28,.12)',ink2:'#2f202c',btnInk:'#ffffff'}},
+  {id:'DAL',abbr:'DAL',name:'達拉斯獨行俠',pal:{field:'#071421',panel:'#0a1f33',panel2:'#0b2740',glow:'#003051',amber:'#b8c4ca',teal:'#84abc7',chalk:'#e8ecf2',muted:'#7d92a6',line:'rgba(232,236,242,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadce4',btnInk:'#071421'},palL:{field:'#e6eef4',panel:'#ffffff',panel2:'#f0f5f8',glow:'#9ebed3',amber:'#585e61',teal:'#00538c',chalk:'#0f1e2b',muted:'#42617d',line:'rgba(15,30,43,.16)',wash:'rgba(15,30,43,.06)',wash2:'rgba(15,30,43,.12)',ink2:'#202935',btnInk:'#ffffff'}},
+  {id:'DEN',abbr:'DEN',name:'丹佛金塊',pal:{field:'#090c15',panel:'#0d121f',panel2:'#101726',glow:'#081425',amber:'#fec524',teal:'#a0a9b3',chalk:'#e8eaee',muted:'#8c909c',line:'rgba(232,234,238,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadbe2',btnInk:'#090c15'},palL:{field:'#e7e9ec',panel:'#ffffff',panel2:'#f1f2f4',glow:'#a3abb6',amber:'#795e11',teal:'#0e2240',chalk:'#11151e',muted:'#474f60',line:'rgba(17,21,30,.16)',wash:'rgba(17,21,30,.06)',wash2:'rgba(17,21,30,.12)',ink2:'#21242d',btnInk:'#ffffff'}},
+  {id:'DET',abbr:'DET',name:'底特律活塞',pal:{field:'#270912',panel:'#3e0e1b',panel2:'#4f1120',glow:'#74091b',amber:'#798fd6',teal:'#e48c99',chalk:'#f2e9ed',muted:'#b08794',line:'rgba(242,233,237,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#e0dbe2',btnInk:'#270912'},palL:{field:'#fae7ea',panel:'#ffffff',panel2:'#fcf1f2',glow:'#eaa4b0',amber:'#1d42ba',teal:'#c8102e',chalk:'#33121a',muted:'#8e4859',line:'rgba(51,18,26,.16)',wash:'rgba(51,18,26,.06)',wash2:'rgba(51,18,26,.12)',ink2:'#36222b',btnInk:'#ffffff'}},
+  {id:'GSW',abbr:'GSW',name:'金州勇士',pal:{field:'#0b1121',panel:'#111b33',panel2:'#15223f',glow:'#112650',amber:'#ffc72c',teal:'#92a3c7',chalk:'#e9ebf2',muted:'#848ea6',line:'rgba(233,235,242,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dbdce4',btnInk:'#0b1121'},palL:{field:'#e8ecf3',panel:'#ffffff',panel2:'#f1f4f8',glow:'#a9b7d3',amber:'#7a5e15',teal:'#1d428a',chalk:'#141b2b',muted:'#4d5b7c',line:'rgba(20,27,43,.16)',wash:'rgba(20,27,43,.06)',wash2:'rgba(20,27,43,.12)',ink2:'#232735',btnInk:'#ffffff'}},
+  {id:'HOU',abbr:'HOU',name:'休士頓火箭',pal:{field:'#280915',panel:'#3f0e20',panel2:'#511127',glow:'#770a26',amber:'#c4ced4',teal:'#e88da3',chalk:'#f2e9ee',muted:'#b28798',line:'rgba(242,233,238,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#e0dbe2',btnInk:'#280915'},palL:{field:'#fae7ec',panel:'#ffffff',panel2:'#fcf1f4',glow:'#eca5b7',amber:'#ce1141',teal:'#ce1141',chalk:'#34121e',muted:'#904861',line:'rgba(52,18,30,.16)',wash:'rgba(52,18,30,.06)',wash2:'rgba(52,18,30,.12)',ink2:'#36222d',btnInk:'#ffffff'}},
+  {id:'IND',abbr:'IND',name:'印第安納溜馬',pal:{field:'#070e1b',panel:'#0a1528',panel2:'#0b1b32',glow:'#001a39',amber:'#fdbb30',teal:'#90a3ba',chalk:'#e8eaf0',muted:'#848ea0',line:'rgba(232,234,240,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadbe3',btnInk:'#070e1b'},palL:{field:'#e6eaef',panel:'#ffffff',panel2:'#f0f2f6',glow:'#9eafc3',amber:'#86631a',teal:'#002d62',chalk:'#0f1724',muted:'#42536d',line:'rgba(15,23,36,.16)',wash:'rgba(15,23,36,.06)',wash2:'rgba(15,23,36,.12)',ink2:'#202531',btnInk:'#ffffff'}},
+  {id:'LAC',abbr:'LAC',name:'洛杉磯快艇',pal:{field:'#270912',panel:'#3e0e1b',panel2:'#4f1120',glow:'#74091b',amber:'#798fba',teal:'#e48c99',chalk:'#f2e9ed',muted:'#b08794',line:'rgba(242,233,237,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#e0dbe2',btnInk:'#270912'},palL:{field:'#fae7ea',panel:'#ffffff',panel2:'#fcf1f2',glow:'#eaa4b0',amber:'#1d428a',teal:'#c8102e',chalk:'#33121a',muted:'#8e4859',line:'rgba(51,18,26,.16)',wash:'rgba(51,18,26,.06)',wash2:'rgba(51,18,26,.12)',ink2:'#36222b',btnInk:'#ffffff'}},
+  {id:'LAL',abbr:'LAL',name:'洛杉磯湖人',pal:{field:'#140d20',panel:'#201331',panel2:'#28183d',glow:'#31154c',amber:'#fdb927',teal:'#b4a0c9',chalk:'#eceaf1',muted:'#968ca7',line:'rgba(236,234,241,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dcdbe4',btnInk:'#140d20'},palL:{field:'#eee9f3',panel:'#ffffff',panel2:'#f5f2f8',glow:'#beacd0',amber:'#866215',teal:'#552583',chalk:'#1e152a',muted:'#62507a',line:'rgba(30,21,42,.16)',wash:'rgba(30,21,42,.06)',wash2:'rgba(30,21,42,.12)',ink2:'#292434',btnInk:'#ffffff'}},
+  {id:'MEM',abbr:'MEM',name:'曼菲斯灰熊',pal:{field:'#161a26',panel:'#22283b',panel2:'#2b334a',glow:'#364462',amber:'#f5b112',teal:'#93a4c5',chalk:'#eceef3',muted:'#858ea6',line:'rgba(236,238,243,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dcdde5',btnInk:'#161a26'},palL:{field:'#eff1f6',panel:'#ffffff',panel2:'#f5f7fa',glow:'#c1cbde',amber:'#825e0a',teal:'#44567b',chalk:'#202430',muted:'#656f88',line:'rgba(32,36,48,.16)',wash:'rgba(32,36,48,.06)',wash2:'rgba(32,36,48,.12)',ink2:'#2a2d38',btnInk:'#ffffff'}},
+  {id:'MIA',abbr:'MIA',name:'邁阿密熱火',pal:{field:'#1f0712',panel:'#310a1b',panel2:'#3f0b20',glow:'#58001b',amber:'#f9a01b',teal:'#d390a3',chalk:'#efe8ed',muted:'#a88999',line:'rgba(239,232,237,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dedae2',btnInk:'#1f0712'},palL:{field:'#f5e6ea',panel:'#ffffff',panel2:'#f9f0f2',glow:'#d89eb0',amber:'#945e10',teal:'#98002e',chalk:'#2a0f1a',muted:'#7b4259',line:'rgba(42,15,26,.16)',wash:'rgba(42,15,26,.06)',wash2:'rgba(42,15,26,.12)',ink2:'#30202b',btnInk:'#ffffff'}},
+  {id:'MIL',abbr:'MIL',name:'密爾瓦基公鹿',pal:{field:'#07120f',panel:'#0a1c16',panel2:'#0b231a',glow:'#002910',amber:'#eee1c6',teal:'#90af9c',chalk:'#e8ebec',muted:'#849390',line:'rgba(232,235,236,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadce1',btnInk:'#07120f'},palL:{field:'#e6ede8',panel:'#ffffff',panel2:'#f0f4f1',glow:'#9eb9a8',amber:'#00471b',teal:'#00471b',chalk:'#0f1c17',muted:'#425d52',line:'rgba(15,28,23,.16)',wash:'rgba(15,28,23,.06)',wash2:'rgba(15,28,23,.12)',ink2:'#202829',btnInk:'#ffffff'}},
+  {id:'MIN',abbr:'MIN',name:'明尼蘇達灰狼',pal:{field:'#090c15',panel:'#0d131f',panel2:'#0f1726',glow:'#071425',amber:'#78be20',teal:'#95a0ab',chalk:'#e8eaee',muted:'#8c909c',line:'rgba(232,234,238,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadbe2',btnInk:'#090c15'},palL:{field:'#e7e9ec',panel:'#ffffff',panel2:'#f0f2f4',glow:'#a3abb6',amber:'#467013',teal:'#0c2340',chalk:'#11151e',muted:'#464f60',line:'rgba(17,21,30,.16)',wash:'rgba(17,21,30,.06)',wash2:'rgba(17,21,30,.12)',ink2:'#21242d',btnInk:'#ffffff'}},
+  {id:'NOP',abbr:'NOP',name:'紐奧良鵜鶘',pal:{field:'#090c15',panel:'#0d131f',panel2:'#0f1726',glow:'#071425',amber:'#df7284',teal:'#95a0ab',chalk:'#e8eaee',muted:'#8c909c',line:'rgba(232,234,238,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadbe2',btnInk:'#090c15'},palL:{field:'#e7e9ec',panel:'#ffffff',panel2:'#f0f2f4',glow:'#a3abb6',amber:'#c8102e',teal:'#0c2340',chalk:'#11151e',muted:'#464f60',line:'rgba(17,21,30,.16)',wash:'rgba(17,21,30,.06)',wash2:'rgba(17,21,30,.12)',ink2:'#21242d',btnInk:'#ffffff'}},
+  {id:'NYK',abbr:'NYK',name:'紐約尼克',pal:{field:'#071828',panel:'#0a253e',panel2:'#0b304e',glow:'#003e6a',amber:'#f58426',teal:'#76b0d7',chalk:'#e8edf4',muted:'#7694af',line:'rgba(232,237,244,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadde6',btnInk:'#071828'},palL:{field:'#e6f0f8',panel:'#ffffff',panel2:'#f0f6fb',glow:'#9ec7e3',amber:'#a05619',teal:'#006bb6',chalk:'#0f2233',muted:'#426a8d',line:'rgba(15,34,51,.16)',wash:'rgba(15,34,51,.06)',wash2:'rgba(15,34,51,.12)',ink2:'#202c3a',btnInk:'#ffffff'}},
+  {id:'OKC',abbr:'OKC',name:'奧克拉荷馬雷霆',pal:{field:'#071a2a',panel:'#0a2941',panel2:'#0b3552',glow:'#004770',amber:'#f37160',teal:'#67b0da',chalk:'#e8eef4',muted:'#6e94b0',line:'rgba(232,238,244,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadde6',btnInk:'#071a2a'},palL:{field:'#e6f2f9',panel:'#ffffff',panel2:'#f0f7fb',glow:'#9ecce7',amber:'#ef3b24',teal:'#006eae',chalk:'#0f2535',muted:'#427091',line:'rgba(15,37,53,.16)',wash:'rgba(15,37,53,.06)',wash2:'rgba(15,37,53,.12)',ink2:'#202d3b',btnInk:'#ffffff'}},
+  {id:'ORL',abbr:'ORL',name:'奧蘭多魔術',pal:{field:'#071a2a',panel:'#0a2941',panel2:'#0b3452',glow:'#00456f',amber:'#c4ced4',teal:'#67add9',chalk:'#e8eef4',muted:'#6e93af',line:'rgba(232,238,244,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadde6',btnInk:'#071a2a'},palL:{field:'#e6f1f9',panel:'#ffffff',panel2:'#f0f7fb',glow:'#9ecbe7',amber:'#0077c0',teal:'#006bad',chalk:'#0f2435',muted:'#426f91',line:'rgba(15,36,53,.16)',wash:'rgba(15,36,53,.06)',wash2:'rgba(15,36,53,.12)',ink2:'#202d3b',btnInk:'#ffffff'}},
+  {id:'PHI',abbr:'PHI',name:'費城76人',pal:{field:'#071828',panel:'#0a253e',panel2:'#0b304e',glow:'#003e6a',amber:'#f36789',teal:'#76b0d7',chalk:'#e8edf4',muted:'#7694af',line:'rgba(232,237,244,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadde6',btnInk:'#071828'},palL:{field:'#e6f0f8',panel:'#ffffff',panel2:'#f0f6fb',glow:'#9ec7e3',amber:'#ed174c',teal:'#006bb6',chalk:'#0f2233',muted:'#426a8d',line:'rgba(15,34,51,.16)',wash:'rgba(15,34,51,.06)',wash2:'rgba(15,34,51,.12)',ink2:'#202c3a',btnInk:'#ffffff'}},
+  {id:'PHX',abbr:'PHX',name:'鳳凰城太陽',pal:{field:'#100b1d',panel:'#19112b',panel2:'#1f1536',glow:'#221140',amber:'#e87036',teal:'#aa9dc1',chalk:'#ebe9f0',muted:'#918aa3',line:'rgba(235,233,240,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dcdbe3',btnInk:'#100b1d'},palL:{field:'#ebe8f0',panel:'#ffffff',panel2:'#f3f1f6',glow:'#b5a9c8',amber:'#b94d1a',teal:'#3b1d6e',chalk:'#191426',muted:'#584d72',line:'rgba(25,20,38,.16)',wash:'rgba(25,20,38,.06)',wash2:'rgba(25,20,38,.12)',ink2:'#262332',btnInk:'#ffffff'}},
+  {id:'POR',abbr:'POR',name:'波特蘭拓荒者',pal:{field:'#2b1015',panel:'#44191f',panel2:'#571f26',glow:'#822224',amber:'#e87072',teal:'#ec898c',chalk:'#f3ebee',muted:'#b4868d',line:'rgba(243,235,238,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#e0dce2',btnInk:'#2b1015'},palL:{field:'#fcebec',panel:'#ffffff',panel2:'#fdf3f3',glow:'#f3b4b6',amber:'#e03a3e',teal:'#ca3438',chalk:'#37191d',muted:'#97585f',line:'rgba(55,25,29,.16)',wash:'rgba(55,25,29,.06)',wash2:'rgba(55,25,29,.12)',ink2:'#38262d',btnInk:'#ffffff'}},
+  {id:'SAC',abbr:'SAC',name:'沙加緬度國王',pal:{field:'#150e20',panel:'#211530',panel2:'#2a1b3c',glow:'#341a4b',amber:'#9aa5ad',teal:'#b099c2',chalk:'#eceaf1',muted:'#978ea6',line:'rgba(236,234,241,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dcdbe4',btnInk:'#150e20'},palL:{field:'#eeeaf2',panel:'#ffffff',panel2:'#f5f2f7',glow:'#c0afcf',amber:'#5b6166',teal:'#5a2d81',chalk:'#1f1729',muted:'#645379',line:'rgba(31,23,41,.16)',wash:'rgba(31,23,41,.06)',wash2:'rgba(31,23,41,.12)',ink2:'#2a2534',btnInk:'#ffffff'}},
+  {id:'SAS',abbr:'SAS',name:'聖安東尼奧馬刺',pal:{field:'#101116',panel:'#191a21',panel2:'#1f2128',glow:'#222528',amber:'#c4ced4',teal:'#a0a2a4',chalk:'#ebebee',muted:'#8c8d95',line:'rgba(235,235,238,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dcdce2',btnInk:'#101116'},palL:{field:'#ebecec',panel:'#ffffff',panel2:'#f3f3f4',glow:'#b4b6b8',amber:'#3a3f45',teal:'#3a3f45',chalk:'#191a1e',muted:'#585a62',line:'rgba(25,26,30,.16)',wash:'rgba(25,26,30,.06)',wash2:'rgba(25,26,30,.12)',ink2:'#26272d',btnInk:'#ffffff'}},
+  {id:'TOR',abbr:'TOR',name:'多倫多暴龍',pal:{field:'#280915',panel:'#3f0e20',panel2:'#511127',glow:'#770a26',amber:'#a1a1a4',teal:'#e88da3',chalk:'#f2e9ee',muted:'#b28798',line:'rgba(242,233,238,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#e0dbe2',btnInk:'#280915'},palL:{field:'#fae7ec',panel:'#ffffff',panel2:'#fcf1f4',glow:'#eca5b7',amber:'#5e5e61',teal:'#ce1141',chalk:'#34121e',muted:'#904861',line:'rgba(52,18,30,.16)',wash:'rgba(52,18,30,.06)',wash2:'rgba(52,18,30,.12)',ink2:'#36222d',btnInk:'#ffffff'}},
+  {id:'UTA',abbr:'UTA',name:'猶他爵士',pal:{field:'#070e1a',panel:'#0a1527',panel2:'#0b1a30',glow:'#001935',amber:'#f9a01b',teal:'#90a2b8',chalk:'#e8eaef',muted:'#8992a2',line:'rgba(232,234,239,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadbe3',btnInk:'#070e1a'},palL:{field:'#e6eaef',panel:'#ffffff',panel2:'#f0f2f5',glow:'#9eaec1',amber:'#945e10',teal:'#002b5c',chalk:'#0f1623',muted:'#42526b',line:'rgba(15,22,35,.16)',wash:'rgba(15,22,35,.06)',wash2:'rgba(15,22,35,.12)',ink2:'#202430',btnInk:'#ffffff'}},
+  {id:'WAS',abbr:'WAS',name:'華盛頓巫師',pal:{field:'#070e1a',panel:'#0a1527',panel2:'#0b1a30',glow:'#001935',amber:'#ec687c',teal:'#90a2b8',chalk:'#e8eaef',muted:'#8992a2',line:'rgba(232,234,239,.15)',wash:'rgba(255,255,255,.07)',wash2:'rgba(255,255,255,.13)',ink2:'#dadbe3',btnInk:'#070e1a'},palL:{field:'#e6eaef',panel:'#ffffff',panel2:'#f0f2f5',glow:'#9eaec1',amber:'#e31837',teal:'#002b5c',chalk:'#0f1623',muted:'#42526b',line:'rgba(15,22,35,.16)',wash:'rgba(15,22,35,.06)',wash2:'rgba(15,22,35,.12)',ink2:'#202430',btnInk:'#ffffff'}}];
+let themeMode=localStorage.getItem('nba_mode')||'dark';
+let fxTheme=localStorage.getItem('nba_theme')||'nba';
+if(!THEMES.some(t=>t.id===fxTheme))fxTheme='nba';
 const fxCanvas=document.getElementById('fx');
 const fxCtx=fxCanvas.getContext('2d');
 let fxParts=[],fxRAF=null,fxLast=0;
@@ -1554,169 +1576,67 @@ function fxResize(){fxCanvas.width=innerWidth;fxCanvas.height=innerHeight;}
 addEventListener('resize',fxResize);fxResize();
 function rnd(a,b){return a+Math.random()*(b-a);}
 
-const FX_ALIAS={sunrise:'cream',lemon:'dusk',sakura:'daysky',ice:'daysky'};
-const fxEff=()=>FX_ALIAS[fxTheme]||fxTheme;
-let rockets=[],sparks=[],rocketT=0,flashT=0,flashNext=0,streak=null,streakT=0;
-const FW_COLORS=['255,213,74','255,180,60','255,236,150','240,193,90','255,150,80'];
+function hexRgbStr(h){h=(h||'').trim().replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return isNaN(n)?'255,255,255':((n>>16&255)+','+(n>>8&255)+','+(n&255));}
 function fxInit(){
-  fxParts=[];rockets=[];sparks=[];rocketT=0;flashT=0;flashNext=rnd(3,7);streak=null;streakT=rnd(4,8);
-  const n=Math.min(90,Math.round(innerWidth*innerHeight/16000));
-  if(fxEff()==='dusk'){
-    for(let i=0;i<n;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
-      r:rnd(1,3.2),vx:rnd(4,14),vy:-rnd(2,8),o:rnd(.1,.38),tw:rnd(0,6.28)});
-  }else if(fxEff()==='storm'){
-    for(let i=0;i<n*1.6;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
-      vy:rnd(560,920),vx:-rnd(30,80),o:rnd(.1,.28)});
-  }else if(fxEff()==='neon'){
-    for(let i=0;i<n*.8;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
-      r:rnd(1.5,4),vx:rnd(-10,10),vy:rnd(-6,6),o:rnd(.12,.4),
-      c:Math.random()<.5?'255,138,60':'77,196,255',tw:rnd(0,6.28)});
-  }else if(fxEff()==='daysky'){
-    for(let i=0;i<Math.max(5,n*0.16);i++)fxParts.push({x:rnd(-80,innerWidth),y:rnd(20,innerHeight*.55),
-      s:rnd(.6,1.7),v:rnd(7,18),o:rnd(.3,.5)});
-  }else if(fxEff()==='grass'){
-    for(let i=0;i<n*0.8;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
-      r:rnd(1.2,2.6),vx:rnd(-6,6),vy:-rnd(6,16),o:rnd(.18,.45),tw:rnd(0,6.28)});
-  }else if(fxEff()==='cream'){
-    for(let i=0;i<n*0.7;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
-      r:rnd(1,3),vx:rnd(4,12),vy:-rnd(2,7),o:rnd(.12,.35),tw:rnd(0,6.28)});
-  }
+  fxParts=[];
+  const cs=document.documentElement.style;
+  const c1=hexRgbStr(cs.getPropertyValue('--amber')),c2=hexRgbStr(cs.getPropertyValue('--teal'));
+  const n=Math.min(70,Math.round(innerWidth*innerHeight/22000));
+  for(let i=0;i<n;i++)fxParts.push({x:rnd(0,innerWidth),y:rnd(0,innerHeight),
+    r:rnd(1.4,3.6),vx:rnd(-9,9),vy:rnd(-8,-2),o:rnd(.10,.30),
+    c:Math.random()<.5?c1:c2,tw:rnd(0,6.28)});
 }
 function fxTick(t){
   const dt=Math.min(.05,(t-fxLast)/1000||.016);fxLast=t;
   const W=fxCanvas.width,H=fxCanvas.height;
   fxCtx.clearRect(0,0,W,H);
-  if(fxEff()==='fireworks'){
-    rocketT-=dt;
-    if(rocketT<=0){rockets.push({x:rnd(W*.15,W*.85),y:H+8,vy:-rnd(H*.55,H*.8),
-      ty:rnd(H*.18,H*.42),c:FW_COLORS[Math.floor(rnd(0,FW_COLORS.length))]});rocketT=rnd(1.6,3.6);}
-    rockets=rockets.filter(r=>{
-      r.y+=r.vy*dt;
-      fxCtx.fillStyle=`rgba(${r.c},.5)`;
-      fxCtx.beginPath();fxCtx.arc(r.x,r.y,2,0,6.28);fxCtx.fill();
-      fxCtx.strokeStyle=`rgba(${r.c},.18)`;fxCtx.lineWidth=1.4;
-      fxCtx.beginPath();fxCtx.moveTo(r.x,r.y);fxCtx.lineTo(r.x,r.y+18);fxCtx.stroke();
-      if(r.y<=r.ty){
-        const cnt=Math.floor(rnd(38,64));
-        for(let i=0;i<cnt;i++){const a=rnd(0,6.28),sp=rnd(50,170);
-          sparks.push({x:r.x,y:r.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
-            life:rnd(.8,1.6),max:1.6,c:r.c});}
-        return false;
-      }
-      return true;
-    });
-    sparks=sparks.filter(s=>{
-      s.life-=dt;if(s.life<=0)return false;
-      s.vy+=70*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;
-      const o=Math.min(.5,(s.life/s.max)*.55);
-      fxCtx.fillStyle=`rgba(${s.c},${o})`;
-      fxCtx.beginPath();fxCtx.arc(s.x,s.y,1.6,0,6.28);fxCtx.fill();
-      return true;
-    });
-  }else if(fxEff()==='dusk'){
-    fxParts.forEach(p=>{
-      p.tw+=dt*1.5;p.x+=p.vx*dt;p.y+=p.vy*dt;
-      if(p.x>W+8)p.x=-8;if(p.y<-8){p.y=H+8;p.x=rnd(0,W);}
-      const o=p.o*(0.65+0.35*Math.sin(p.tw));
-      const g=fxCtx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
-      g.addColorStop(0,`rgba(255,205,90,${o})`);g.addColorStop(1,'rgba(255,205,90,0)');
-      fxCtx.fillStyle=g;fxCtx.beginPath();fxCtx.arc(p.x,p.y,p.r*3,0,6.28);fxCtx.fill();
-    });
-  }else if(fxEff()==='storm'){
-    fxCtx.strokeStyle='rgba(255,170,80,.001)';
-    fxParts.forEach(p=>{
-      p.y+=p.vy*dt;p.x+=p.vx*dt;
-      if(p.y>H+20){p.y=-20;p.x=rnd(0,W+80);}
-      const len=p.vy*.022;
-      fxCtx.strokeStyle=`rgba(255,170,80,${p.o})`;fxCtx.lineWidth=1;
-      fxCtx.beginPath();fxCtx.moveTo(p.x,p.y);fxCtx.lineTo(p.x+p.vx*.02,p.y+len);fxCtx.stroke();
-    });
-    flashNext-=dt;
-    if(flashNext<=0&&flashT<=0){flashT=.32;flashNext=rnd(4,9);}
-    if(flashT>0){
-      flashT-=dt;
-      const pr=flashT/.32;
-      const flick=(pr>.75||((pr<.5)&&(pr>.3)))?1:0.25;
-      const o=Math.min(.22,.22*pr*flick);
-      fxCtx.fillStyle=`rgba(215,230,255,${o})`;fxCtx.fillRect(0,0,W,H);
-    }
-  }else if(fxEff()==='neon'){
-    fxParts.forEach(p=>{
-      p.tw+=dt*2.2;p.x+=p.vx*dt;p.y+=p.vy*dt;
-      if(p.x<-10)p.x=W+10;if(p.x>W+10)p.x=-10;
-      if(p.y<-10)p.y=H+10;if(p.y>H+10)p.y=-10;
-      const o=p.o*(0.6+0.4*Math.sin(p.tw));
-      const g=fxCtx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3.2);
-      g.addColorStop(0,`rgba(${p.c},${o})`);g.addColorStop(1,`rgba(${p.c},0)`);
-      fxCtx.fillStyle=g;fxCtx.beginPath();fxCtx.arc(p.x,p.y,p.r*3.2,0,6.28);fxCtx.fill();
-    });
-    streakT-=dt;
-    if(streakT<=0&&!streak){streak={x:-W*.2,y:rnd(H*.15,H*.85),v:rnd(W*.9,W*1.4),
-      c:Math.random()<.5?'255,138,60':'77,196,255'};streakT=rnd(5,9);}
-    if(streak){
-      streak.x+=streak.v*dt;
-      const g=fxCtx.createLinearGradient(streak.x-W*.18,streak.y,streak.x,streak.y);
-      g.addColorStop(0,`rgba(${streak.c},0)`);g.addColorStop(1,`rgba(${streak.c},.35)`);
-      fxCtx.strokeStyle=g;fxCtx.lineWidth=2;
-      fxCtx.beginPath();fxCtx.moveTo(streak.x-W*.18,streak.y);fxCtx.lineTo(streak.x,streak.y);fxCtx.stroke();
-      if(streak.x-W*.18>W)streak=null;
-    }
-  }else if(fxEff()==='daysky'){
-    fxParts.forEach(p=>{
-      p.x+=p.v*dt;
-      if(p.x-90*p.s>W){p.x=-90*p.s;p.y=rnd(20,H*.55);}
-      fxCtx.fillStyle=`rgba(255,255,255,${p.o})`;
-      const e=(cx,cy,rx,ry)=>{fxCtx.beginPath();fxCtx.ellipse(cx,cy,rx,ry,0,0,6.28);fxCtx.fill();};
-      e(p.x,p.y,44*p.s,15*p.s);e(p.x-27*p.s,p.y+7*p.s,27*p.s,11*p.s);e(p.x+28*p.s,p.y+7*p.s,30*p.s,12*p.s);
-    });
-  }else if(fxEff()==='grass'){
-    fxParts.forEach(p=>{
-      p.tw+=dt*1.8;p.x+=(p.vx+Math.sin(p.tw)*6)*dt;p.y+=p.vy*dt;
-      if(p.y<-8){p.y=H+8;p.x=rnd(0,W);}
-      const o=p.o*(0.6+0.4*Math.sin(p.tw));
-      fxCtx.fillStyle=`rgba(120,160,60,${o})`;
-      fxCtx.beginPath();fxCtx.arc(p.x,p.y,p.r,0,6.28);fxCtx.fill();
-    });
-  }else if(fxEff()==='cream'){
-    fxParts.forEach(p=>{
-      p.tw+=dt*1.4;p.x+=p.vx*dt;p.y+=p.vy*dt;
-      if(p.x>W+8)p.x=-8;if(p.y<-8){p.y=H+8;p.x=rnd(0,W);}
-      const o=p.o*(0.65+0.35*Math.sin(p.tw));
-      const g=fxCtx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
-      g.addColorStop(0,`rgba(190,140,80,${o})`);g.addColorStop(1,'rgba(190,140,80,0)');
-      fxCtx.fillStyle=g;fxCtx.beginPath();fxCtx.arc(p.x,p.y,p.r*3,0,6.28);fxCtx.fill();
-    });
-  }
+  fxParts.forEach(p=>{
+    p.tw+=dt*1.8;p.x+=(p.vx+Math.sin(p.tw)*4)*dt;p.y+=p.vy*dt;
+    if(p.y<-12){p.y=H+12;p.x=rnd(0,W);}
+    if(p.x<-12)p.x=W+12;if(p.x>W+12)p.x=-12;
+    const o=p.o*(0.6+0.4*Math.sin(p.tw));
+    const g=fxCtx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
+    g.addColorStop(0,`rgba(${p.c},${o})`);g.addColorStop(1,`rgba(${p.c},0)`);
+    fxCtx.fillStyle=g;fxCtx.beginPath();fxCtx.arc(p.x,p.y,p.r*3,0,6.28);fxCtx.fill();
+  });
   fxRAF=requestAnimationFrame(fxTick);
 }
 function applyTheme(id){
   fxTheme=id;localStorage.setItem('nba_theme',id);
   const th=THEMES.find(t=>t.id===id)||THEMES[0];
+  const pal=(themeMode==='light'&&th.palL)?th.palL:th.pal;
   const r=document.documentElement.style;
-  r.setProperty('--field',th.pal.field);
-  r.setProperty('--panel',th.pal.panel);
-  r.setProperty('--panel-2',th.pal.panel2);
-  r.setProperty('--glow-top',th.pal.glow);
-  r.setProperty('--amber',th.pal.amber);
-  r.setProperty('--teal',th.pal.teal);
-  r.setProperty('--chalk',th.pal.chalk);
-  r.setProperty('--muted',th.pal.muted);
-  r.setProperty('--line',th.pal.line);
-  r.setProperty('--wash',th.pal.wash);
-  r.setProperty('--wash2',th.pal.wash2);
-  r.setProperty('--ink2',th.pal.ink2);
-  r.setProperty('--btn-ink',th.pal.btnInk);
-  document.documentElement.style.colorScheme=th.light?'light':'dark';
+  r.setProperty('--field',pal.field);
+  r.setProperty('--panel',pal.panel);
+  r.setProperty('--panel-2',pal.panel2);
+  r.setProperty('--glow-top',pal.glow);
+  r.setProperty('--amber',pal.amber);
+  r.setProperty('--teal',pal.teal);
+  r.setProperty('--chalk',pal.chalk);
+  r.setProperty('--muted',pal.muted);
+  r.setProperty('--line',pal.line);
+  r.setProperty('--wash',pal.wash);
+  r.setProperty('--wash2',pal.wash2);
+  r.setProperty('--ink2',pal.ink2);
+  r.setProperty('--btn-ink',pal.btnInk);
+  document.documentElement.style.colorScheme=themeMode==='light'?'light':'dark';
   document.querySelectorAll('.theme-b').forEach(b=>b.classList.toggle('on',b.dataset.t===id));
   cancelAnimationFrame(fxRAF);fxRAF=null;
   fxCtx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
-  if(id==='night'||reduceMotion)return;
+  if(reduceMotion)return;
   fxInit();fxLast=0;fxRAF=requestAnimationFrame(fxTick);
 }
 const tb=document.getElementById('themeBar');
-tb.innerHTML='<span style="font-family:var(--cond);letter-spacing:.1em;font-size:12px;color:var(--muted);text-transform:uppercase;font-weight:600">背景</span>'
-  +THEMES.map(t=>`<button class="theme-b" data-t="${t.id}" title="${t.name}">${t.emoji}</button>`).join('');
-tb.querySelectorAll('.theme-b').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.t)));
+tb.innerHTML='<span style="font-family:var(--cond);letter-spacing:.1em;font-size:12px;color:var(--muted);text-transform:uppercase;font-weight:600">主題</span>'
+  +`<button class="theme-b" id="modeBtn" title="亮/暗模式切換" style="width:34px">${themeMode==='light'?'☀️':'🌙'}</button>`
+  +THEMES.map(t=>`<button class="theme-b tb-abbr" data-t="${t.id}" title="${t.name}">${t.abbr}</button>`).join('');
+tb.querySelectorAll('.theme-b[data-t]').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.t)));
+document.getElementById('modeBtn').addEventListener('click',()=>{
+  themeMode=themeMode==='light'?'dark':'light';
+  localStorage.setItem('nba_mode',themeMode);
+  document.getElementById('modeBtn').textContent=themeMode==='light'?'☀️':'🌙';
+  applyTheme(fxTheme);
+});
 applyTheme(fxTheme);
 
 /* ---------- 區塊收合 ---------- */
