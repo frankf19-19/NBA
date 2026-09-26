@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.6.2(賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -74,7 +74,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
 
   /* ---------- 自我檢查:去重、移除損壞紀錄 ---------- */
   let fixed=0;
-  {const seen=new Set(),out=[];
+  {const seen=new Set(),seenKey=new Set(),out=[];
     for(const e of LED){
       if(!e||!e.id||seen.has(e.id)||!Number.isFinite(e.m)||!Number.isFinite(e.am)||
         !(e.hid>=1&&e.hid<=30&&e.aid>=1&&e.aid<=30)||   /* 全明星賽等表演賽 */
@@ -82,7 +82,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
 !/^\d{4}-\d\d-\d\d$/.test(e.d||'')){fixed++;continue;}
       if(!e.sy)e.sy=(+e.d.slice(5,7)>=8)?+e.d.slice(0,4)+1:+e.d.slice(0,4);
       if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1]){e.sy=2020;e.nu=1;}
-      seen.add(e.id);out.push(e);}
+      const gk=e.d+'|'+e.hid+'|'+e.aid;   /* ESPN 偶有同一場比賽登錄兩次(不同編號),同日同主客組合只留一筆 */
+      if(seenKey.has(gk)){fixed++;continue;}
+      seenKey.add(gk);seen.add(e.id);out.push(e);}
     LED=out.sort((a,b)=>a.d.localeCompare(b.d));}
 
   /* ---------- 載入網頁本身(雲端建置模式:不自動執行畫面流程) ---------- */
@@ -113,6 +115,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const seasonNow=+E(`seasonOf('${today}')`);
   let bootstrap=!LED.length;
   const have=new Set(LED.map(e=>e.id));
+  const haveKey=new Set(LED.map(e=>e.d+'|'+e.hid+'|'+e.aid));
   let added=0,errors=0,days=0;
   for(let sy=FIRST_SEASON;sy<=seasonNow;sy++){
     const m=meta.seasons[sy]||{};
@@ -135,13 +138,13 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       try{
         setCur(d);
         const r=await W.samplesForDate(d);
-        const fresh=[...r.samples].filter(x=>x.st!==1&&(x.sy||sy)===sy&&!have.has(String(x.id))).map(x=>{
+        const fresh=[...r.samples].filter(x=>x.st!==1&&(x.sy||sy)===sy&&!have.has(String(x.id))&&!haveKey.has(x.d+'|'+x.hid+'|'+x.aid)).map(x=>{
           const e={id:String(x.id),d:x.d,sy:x.sy||sy,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,st:x.st,po:x.po?1:0,
             m:+(+x.m).toFixed(2),am:x.actM,hit:x.nm?null:(((x.m>=0)===x.homeWon)?1:0)};
           if(x.nm)e.nm=1;
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           return e;});
-        if(fresh.length){fresh.forEach(e=>{have.add(e.id);insertSorted(LED,e);});added+=fresh.length;sAdd+=fresh.length;}
+        if(fresh.length){fresh.forEach(e=>{have.add(e.id);haveKey.add(e.d+'|'+e.hid+'|'+e.aid);insertSorted(LED,e);});added+=fresh.length;sAdd+=fresh.length;}
         return true;
       }catch(e){console.error(d,'失敗:',e.message);return false;}
     };
