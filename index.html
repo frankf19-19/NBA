@@ -386,7 +386,7 @@
     </section>
   </div>
 
-  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.5 · 資料來源:ESPN 公開 API</footer>
+  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 2011-12 賽季起全部比賽與每場球員數據;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.5.1 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -435,7 +435,7 @@ async function fetchGames(date){
       return e&&e.athlete?{name:e.athlete.displayName,id:e.athlete.id,val:e.displayValue}:null;};
     const sc=t=>t.score!=null&&t.score!==''?+t.score:null;
     out.push({id:ev.id,status:state,detail:ts.shortDetail||ts.detail||'',typeName:ts.name||'',
-      stype:(ev.season&&ev.season.type)||2,
+      stype:(ev.season&&ev.season.type)||2,syear:(ev.season&&ev.season.year)||null,
       away:away.team?.displayName||'客隊',home:home.team?.displayName||'主隊',
       awayAbbr:away.team?.abbreviation||'',homeAbbr:home.team?.abbreviation||'',
       awayId:+(away.team?.id||away.id||0),homeId:+(home.team?.id||home.id||0),
@@ -611,25 +611,30 @@ async function capturePlayerLines(maxN,since){
 /* ---------- 主力缺陣影響自學:紀錄簿裡「該隊前三得分手未上場」的比賽,殘差告訴我們每缺 1 分場均該折多少 ---------- */
 let INJ_F=0.35;
 function learnInjFactor(src){
-  const L=(src||ledger()).filter(e=>e.pl&&e.pl.h&&e.pl.a&&e.hid&&e.aid&&!e.po);
+  const L=(src||ledger()).filter(e=>e.pl&&e.pl.h&&e.pl.a&&e.hid&&e.aid&&!e.po&&!e.nu);
   let sum=0,pSum=0,n=0;
+  const ssOf=e=>e.sy||seasonOf(e.d);
+  const absRows=[],base={};
   /* 主力 = 該隊同一季在紀錄簿中出賽 ≥8 場、場均得分前三者(隨轉隊與賽季自動更新) */
   const agg={};
-  L.forEach(e=>{const ss=seasonOf(e.d);
+  L.forEach(e=>{const ss=ssOf(e);
     [['h',e.hid],['a',e.aid]].forEach(([sd,tid])=>{const k=tid+'_'+ss;const t=agg[k]=agg[k]||{};
       e.pl[sd].forEach(x=>{const q=t[x.id]=t[x.id]||{id:x.id,g:0,p:0};q.g++;q.p+=x.pts||0;});});});
   const coreOf={};
   L.forEach(e=>{
     [['h',1,e.hid],['a',-1,e.aid]].forEach(([sd,sg,tid])=>{
-      const key=tid+'_'+seasonOf(e.d);
+      const key=tid+'_'+ssOf(e);
       if(!coreOf[key])coreOf[key]=Object.values(agg[key]||{}).filter(q=>q.g>=8).map(q=>({id:q.id,pts:q.p/q.g})).sort((a,b)=>b.pts-a.pts).slice(0,3);
       const core=coreOf[key];if(core.length<3)return;
       const played=new Set(e.pl[sd].map(x=>x.id));
       const absent=core.filter(p=>!played.has(p.id));
-      if(!absent.length)return;
-      sum+=sg*(e.am-e.m*MARGIN_K);pSum+=absent.reduce((a,p)=>a+p.pts,0);n++;
+      const resid=sg*(e.am-e.m*MARGIN_K);
+      if(!absent.length){const b=base[key]=base[key]||{s:0,n:0};b.s+=resid;b.n++;return;}
+      absRows.push({key,resid,pts:absent.reduce((a,p)=>a+p.pts,0)});
     });
   });
+  absRows.forEach(r=>{const b=base[r.key];if(!b||b.n<5)return;
+    sum+=r.resid-b.s/b.n;pSum+=r.pts;n++;});
   if(n<30)return {n,f:0.35,r:n?sum/n:0,learned:false};
   const rBar=sum/n,pBar=Math.max(8,pSum/n);
   const raw=-rBar/pBar;
@@ -679,7 +684,7 @@ function teamBias(name,beforeDate){
   for(let i=L.length-1;i>=0&&n<12;i--){
     const e=L[i];
     if(beforeDate&&e.d>=beforeDate)continue;
-    if(e.po)continue;
+    if(e.po||e.nu)continue;
     let sgn=0;if(e.hm===name)sgn=1;else if(e.aw===name)sgn=-1;else continue;
     sum+=sgn*(e.am-e.m*MARGIN_K);n++;
   }
@@ -1603,6 +1608,15 @@ function renderCalibHist(){
     const hh=CLOUD.health||{};
     html=`<div class="tag" style="margin-top:8px;color:var(--teal)">☁️ 雲端校準${cloudFresh()?'':'(已逾 36 小時,暫以本機校準)'}:K=${(+CLOUD.k).toFixed(2)} · σ=${(+CLOUD.sigma).toFixed(2)} · 紀錄簿 ${hh.games??(CLOUD.ledger||[]).length} 場(例行賽 ${hh.reg??'-'}、季後賽 ${hh.po??'-'})· 最後比賽日 ${esc(CLOUD.last||'-')} · 更新於 ${new Date(CLOUD.updated).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}${hh.fixed?` · 自我檢查修復 ${hh.fixed} 筆`:''}</div>`+html;
   }
+  if(CLOUD&&CLOUD.health&&Array.isArray(CLOUD.health.seasons)&&CLOUD.health.seasons.length){
+    const ssr=CLOUD.health.seasons.slice().reverse();
+    const lbl=y=>`${y-1}-${String(y).slice(2)}`;
+    html+=`<div class="pos-group" style="margin-top:14px">歷年回測(雲端紀錄簿 ${ssr.length} 個賽季,例行賽,每場都以「當時之前」的資料預測)</div>
+      <div class="table-wrap"><table class="stat" style="min-width:420px">
+      <tr><th>賽季</th><th>場數</th><th>命中率</th><th>分差誤差</th><th>季後賽</th><th>球員數據</th></tr>
+      ${ssr.map(x=>`<tr><td>${lbl(x.s)}</td><td>${x.n}</td><td>${x.hit}%</td><td>${x.mae} 分</td><td>${x.po}</td><td>${x.pl}</td></tr>`).join('')}
+      </table></div>`;
+  }
   const npl=Object.keys(PDB.players).length;
   if(npl){
     const withPl=cloudFresh()&&CLOUD.health?CLOUD.health.withPl:L.filter(e=>e.pl).length;
@@ -1627,9 +1641,10 @@ function renderCalibHist(){
 /* 單日回測樣本:網頁與雲端校準共用(雲端在 jsdom 中直接執行本檔,模型永不漂移) */
 async function samplesForDate(date){
   const samples=[];let skipped=0;
-  const asOf=shiftDate(date,-1),season=seasonOf(date);
+  const asOf=shiftDate(date,-1);
   const games=await fetchGames(date);
   if(!games.length)return {samples,skipped};
+  const season=(games.find(g=>g.syear)||{}).syear||seasonOf(date);
   {
     {
       const ids=[...new Set(games.flatMap(g=>[g.awayId,g.homeId]).filter(Boolean))];
@@ -1650,7 +1665,7 @@ async function samplesForDate(date){
         const mPre=p.raw_margin_pre??p.raw_margin;
         if(mPre==null){skipped++;return;}
         samples.push({id:g.id,d:date,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,
-          st:g.stype,po:(g.stype===3||g.stype===5)?1:0,
+          st:g.stype,sy:season,po:(g.stype===3||g.stype===5)?1:0,
           m:mPre,homeWon,actM:(g.homeScore??0)-(g.awayScore??0)});
       });
     }
