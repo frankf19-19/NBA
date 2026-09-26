@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.5.1 多賽季 */
+/* 版本:v1.5.2 多賽季 + 失敗日期重試 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -107,15 +107,20 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   for(let sy=FIRST_SEASON;sy<=seasonNow;sy++){
     const m=meta.seasons[sy]||{};
     if(m.complete)continue;
+    const retry=Array.isArray(m.fail)?m.fail.slice():[];
     const inSeason=LED.filter(e=>e.sy===sy);
     const lastInS=inSeason.length?inSeason[inSeason.length-1].d:null;
-    const start=process.env.BOOT_FROM||(lastInS?shiftDate(lastInS,-2):`${sy-1}-10-01`);
     const endWin=`${sy}-10-15`;
+    /* 已結束卻未封存、且沒有失敗清單(舊版執行留下的):整季重掃一次,已收錄場次自動略過 */
+    const rescan=endWin<yday&&m.games&&!Array.isArray(m.fail);
+    const start=process.env.BOOT_FROM||((lastInS&&!rescan)?shiftDate(lastInS,-2):`${sy-1}-10-01`);
     const end=endWin<yday?endWin:yday;
-    if(start>end){continue;}
-    let sErr=0,sAdd=0;
-    console.log(`== ${sy-1}-${String(sy).slice(2)} 賽季:${start} → ${end}`);
-    for(let d=start;d<=end;d=shiftDate(d,1)){
+    const dates=[...retry];
+    for(let d=start;d<=end;d=shiftDate(d,1))if(!dates.includes(d))dates.push(d);
+    if(!dates.length){continue;}
+    let sErr=0,sAdd=0;const fail=[];
+    console.log(`== ${sy-1}-${String(sy).slice(2)} 賽季:${start} → ${end}${retry.length?`(另重試上次失敗 ${retry.length} 天)`:''}`);
+    const runDay=async d=>{
       days++;
       try{
         const r=await W.samplesForDate(d);
@@ -125,11 +130,17 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           return e;});
         if(fresh.length){fresh.forEach(e=>{have.add(e.id);insertSorted(LED,e);});added+=fresh.length;sAdd+=fresh.length;setLS();}
-      }catch(e){errors++;sErr++;console.error(d,'失敗:',e.message);}
-    }
+        return true;
+      }catch(e){console.error(d,'失敗:',e.message);return false;}
+    };
+    for(const d of dates){days++;if(!(await runDay(d)))fail.push(d);}
+    /* 本次失敗的日期:稍候再重試一輪(ESPN 偶發 502) */
+    if(fail.length){await sleep(8000);
+      for(const d of fail.splice(0)){if(!(await runDay(d)))fail.push(d);}}
+    sErr=fail.length;errors+=sErr;
     const n=LED.filter(e=>e.sy===sy).length;
-    meta.seasons[sy]={complete:(endWin<yday&&sErr===0&&n>0),games:n,checked:today};
-    console.log(`   新增 ${sAdd} 場,本季共 ${n} 場,錯誤 ${sErr}${meta.seasons[sy].complete?',已封存':''}`);
+    meta.seasons[sy]={complete:(endWin<yday&&sErr===0&&n>0),games:n,checked:today,fail};
+    console.log(`   新增 ${sAdd} 場,本季共 ${n} 場,錯誤 ${sErr}${sErr?`(${fail.join(', ')},下次優先重試)`:''}${meta.seasons[sy].complete?',已封存':''}`);
   }
   console.log(`回補 ${days} 天,新增 ${added} 場,錯誤 ${errors},紀錄簿共 ${LED.length} 場`);
 
