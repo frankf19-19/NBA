@@ -1,0 +1,36 @@
+name: 官網連線測試(一次性)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 測試 NBA 官網(cdn.nba.com / stats.nba.com)
+        run: |
+          cat > p.js <<'EOF'
+          const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+          const FULL={'User-Agent':UA,'Accept':'application/json, text/plain, */*','Accept-Language':'en-US,en;q=0.9','Referer':'https://www.nba.com/','Origin':'https://www.nba.com','x-nba-stats-origin':'stats','x-nba-stats-token':'true'};
+          const BARE={'User-Agent':UA};
+          const ADV='https://stats.nba.com/stats/leaguedashteamstats?Season=2025-26&SeasonType=Regular%20Season&MeasureType=Advanced&PerMode=PerGame&LeagueID=00&LastNGames=0&Month=0&OpponentTeamID=0&PaceAdjust=N&Period=0&PlusMinus=N&Rank=N&TeamID=0&DateFrom=&DateTo=&GameScope=&GameSegment=&Location=&Outcome=&PORound=0&PlayerExperience=&PlayerPosition=&SeasonSegment=&ShotClockRange=&StarterBench=&TwoWay=0&VsConference=&VsDivision=&Conference=&Division=&GameSubtype=&ISTRound=';
+          const LOG='https://stats.nba.com/stats/leaguegamelog?Season=2011-12&SeasonType=Regular%20Season&LeagueID=00&PlayerOrTeam=T&Direction=ASC&Sorter=DATE&Counter=0&DateFrom=&DateTo=';
+          const T=[
+            ['CDN_SCHEDULE_FULL','https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json',FULL],
+            ['CDN_SCHEDULE_BARE','https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json',BARE],
+            ['CDN_BOX_FULL','https://cdn.nba.com/static/json/liveData/boxscore/boxscore_0042500401.json',FULL],
+            ['CDN_PBP_FULL','https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_0042500401.json',FULL],
+            ['STATS_ADV_FULL',ADV,FULL],
+            ['STATS_LOG2012_FULL',LOG,FULL],
+            ['STATS_ADV_BARE',ADV,BARE]];
+          (async()=>{for(const [n,u,h] of T){const t0=Date.now();
+            try{const r=await fetch(u,{headers:h,signal:AbortSignal.timeout(25000)});const tx=await r.text();
+              let info='';try{const j=JSON.parse(tx);info=j.resultSets?('rows='+j.resultSets[0].rowSet.length):(j.game?('game='+j.game.gameId):(j.leagueSchedule?('games='+j.leagueSchedule.gameDates.flatMap(d=>d.games).length):'json'));}catch(e){info='notjson:'+tx.slice(0,40).replace(/\s+/g,' ');}
+              console.log(`RESULT ${n} status=${r.status} ms=${Date.now()-t0} bytes=${tx.length} ${info}`);
+            }catch(e){console.log(`RESULT ${n} ERROR ${String(e.name||e).slice(0,40)} ms=${Date.now()-t0}`);}}})();
+          EOF
+          node p.js
