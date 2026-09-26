@@ -386,7 +386,7 @@
     </section>
   </div>
 
-  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.4 · 資料來源:ESPN 公開 API</footer>
+  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.4.1 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -541,8 +541,8 @@ let pdbBuilding=false;
 async function buildPDB(onProg){
   if(pdbBuilding)return;pdbBuilding=true;
   try{
-    const td=await jget(`${SB}/teams?limit=40`);
-    const list=(((((td.sports||[])[0]||{}).leagues||[])[0]||{}).teams||[]).map(t=>t.team).filter(t=>t&&t.id);
+    const sd=await jget('https://site.api.espn.com/apis/v2/sports/basketball/nba/standings?level=2');
+    const list=(sd.children||[]).flatMap(c=>((c.standings||{}).entries||[]).map(e=>e.team)).filter(t=>t&&t.id);
     const next={ts:Date.now(),season:seasonOf(etToday()),players:{},teams:{}};
     for(let i=0;i<list.length;i++){
       const t=list[i];
@@ -1083,7 +1083,8 @@ function evalPlayer(m,age){
 function ovStats(ov){
   const st=ov&&ov.statistics;
   if(!st||!st.names||!st.splits||!st.splits.length)return null;
-  const m={};const vals=(st.splits[0]||{}).stats||[];
+  const sp=st.splits.find(x=>/regular/i.test(x.displayName||''))||st.splits[0];
+  const m={};const vals=(sp||{}).stats||[];
   st.names.forEach((n,i)=>{const v=parseFloat(vals[i]);if(isFinite(v))m[n]=v;});
   return m;
 }
