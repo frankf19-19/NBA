@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.6 1994-95 季起全部賽季 + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v1.6.1 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -99,8 +99,12 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const W=dom.window,E=x=>W.eval(x);
   if(typeof W.samplesForDate!=='function'||typeof W.predict!=='function')throw new Error('index.html 缺少 samplesForDate/predict,無法校準');
   if(isFinite(prev.k)&&isFinite(prev.sigma))E(`MARGIN_K=${+prev.k};RUN_SIGMA=${+prev.sigma};`);
-  const setLS=()=>W.localStorage.setItem('nba_ledger',JSON.stringify(LED.map(slim)));
-  setLS();
+  /* 紀錄簿不放 localStorage(上限 500 萬字元,數萬場會爆):
+     預測某日時,把「該日之前最近 3,000 場」直接交給網頁的 ledger(),逐隊偏差只需每隊最近 12 場,且不偷看未來 */
+  let CUR=[];
+  W.ledger=()=>CUR;
+  const before=d=>{let lo=0,hi=LED.length;while(lo<hi){const mid=(lo+hi)>>1;if(LED[mid].d<d)lo=mid+1;else hi=mid;}return lo;};
+  const setCur=d=>{const i=before(d);CUR=LED.slice(Math.max(0,i-3000),i);};
 
   /* ---------- 1) 逐季、逐日回補(依時間順序,只新增不改寫;已封存賽季略過) ---------- */
   const seasonNow=+E(`seasonOf('${today}')`);
@@ -126,13 +130,14 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     const runDay=async d=>{
       days++;
       try{
+        setCur(d);
         const r=await W.samplesForDate(d);
         const fresh=[...r.samples].filter(x=>x.st!==1&&(x.sy||sy)===sy&&!have.has(String(x.id))).map(x=>{
           const e={id:String(x.id),d:x.d,sy:x.sy||sy,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,st:x.st,po:x.po?1:0,
             m:+(+x.m).toFixed(2),am:x.actM,hit:((x.m>=0)===x.homeWon)?1:0};
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           return e;});
-        if(fresh.length){fresh.forEach(e=>{have.add(e.id);insertSorted(LED,e);});added+=fresh.length;sAdd+=fresh.length;setLS();}
+        if(fresh.length){fresh.forEach(e=>{have.add(e.id);insertSorted(LED,e);});added+=fresh.length;sAdd+=fresh.length;}
         return true;
       }catch(e){console.error(d,'失敗:',e.message);return false;}
     };
