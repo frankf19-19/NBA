@@ -15,7 +15,7 @@ concurrency:
 jobs:
   calibrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,7 +29,8 @@ jobs:
         run: |
           git config user.name "calib-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add calib.json seed-ledger.json pdb.json
+          git add -A calib.json pdb.json seed
+          git add -u
           git diff --cached --quiet && exit 0
           git commit -m "每日自動校準 $(date -u +%F)"
           git pull --rebase origin main
