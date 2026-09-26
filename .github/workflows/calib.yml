@@ -1,0 +1,36 @@
+name: 每日雲端校準
+
+on:
+  schedule:
+    - cron: '10 6 * * *'   # 每天 UTC 06:10(台灣 14:10、美東凌晨 2:10,前一晚比賽已全數結束)
+  workflow_dispatch:        # 也可在 Actions 頁面手動觸發
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nba-calib
+  cancel-in-progress: false
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 安裝 jsdom(雲端直接執行網頁本身的模型)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@24
+      - name: 執行校準
+        run: node scripts/calib.js
+      - name: 提交結果
+        run: |
+          git config user.name "calib-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add calib.json seed-ledger.json pdb.json
+          git diff --cached --quiet && exit 0
+          git commit -m "每日自動校準 $(date -u +%F)"
+          git pull --rebase origin main
+          git push
