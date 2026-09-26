@@ -8,7 +8,7 @@
 
   產出:
     calib.json            K、σ、缺陣係數、校準履歷、歷年回測、近期精簡紀錄簿(供所有裝置共用)
-    seed/ledger-YYYY.json 完整紀錄簿,每個賽季一個檔(含每場兩隊上場球員數據),2011-12 季起
+    seed/ledger-YYYY.json 完整紀錄簿,每個賽季一個檔(含每場兩隊上場球員數據),1994-95 季起
                           已結束的賽季寫完即封存,只有當季檔案每天變動,避免 repo 膨脹
     seed/meta.json        各賽季回補完成狀態
     pdb.json              全聯盟球員資料庫(30 隊全名單 + 本季數據)
@@ -19,14 +19,14 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.5.3 多賽季 + 失敗日期重試 + 排除表演賽 */
+/* 版本:v1.6 1994-95 季起全部賽季 + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
 const F_SEED_OLD=path.join(ROOT,'seed-ledger.json');   // v1.5 舊格式,首次執行自動拆分後移除
 const D_SEED=path.join(ROOT,'seed');
 const F_META=path.join(D_SEED,'meta.json');
-const FIRST_SEASON=+(process.env.FIRST_SEASON||2012);   // 2011-12 賽季起
+const FIRST_SEASON=+(process.env.FIRST_SEASON||1995);   // 1994-95 賽季起(ESPN 完整資料的最早賽季)
 const CLIENT_LEDGER=1500;                                // 網頁端只需近期紀錄(逐隊偏差看每隊最近 12 場)
 const BUBBLE=['2020-07-30','2020-10-12'];                // 2020 泡泡園區:中立場
 const F_PDB=path.join(ROOT,'pdb.json');
@@ -75,6 +75,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     for(const e of LED){
       if(!e||!e.id||seen.has(e.id)||!Number.isFinite(e.m)||!Number.isFinite(e.am)||
         !(e.hid>=1&&e.hid<=30&&e.aid>=1&&e.aid<=30)||   /* 全明星賽等表演賽 */
+        e.am===0||   /* NBA 無和局:0 分差代表缺比分空殼 */
 !/^\d{4}-\d\d-\d\d$/.test(e.d||'')){fixed++;continue;}
       if(!e.sy)e.sy=(+e.d.slice(5,7)>=8)?+e.d.slice(0,4)+1:+e.d.slice(0,4);
       if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1]){e.sy=2020;e.nu=1;}
