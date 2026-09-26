@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.5.2 多賽季 + 失敗日期重試 */
+/* 版本:v1.5.3 多賽季 + 失敗日期重試 + 排除表演賽 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -73,7 +73,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   let fixed=0;
   {const seen=new Set(),out=[];
     for(const e of LED){
-      if(!e||!e.id||seen.has(e.id)||!Number.isFinite(e.m)||!Number.isFinite(e.am)||!/^\d{4}-\d\d-\d\d$/.test(e.d||'')){fixed++;continue;}
+      if(!e||!e.id||seen.has(e.id)||!Number.isFinite(e.m)||!Number.isFinite(e.am)||
+        !(e.hid>=1&&e.hid<=30&&e.aid>=1&&e.aid<=30)||   /* 全明星賽等表演賽 */
+!/^\d{4}-\d\d-\d\d$/.test(e.d||'')){fixed++;continue;}
       if(!e.sy)e.sy=(+e.d.slice(5,7)>=8)?+e.d.slice(0,4)+1:+e.d.slice(0,4);
       if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1]){e.sy=2020;e.nu=1;}
       seen.add(e.id);out.push(e);}
