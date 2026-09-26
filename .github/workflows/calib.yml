@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
       - name: 安裝 jsdom(雲端直接執行網頁本身的模型)
         run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@24
       - name: 執行校準
