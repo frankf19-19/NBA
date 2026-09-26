@@ -386,7 +386,7 @@
     </section>
   </div>
 
-  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.3 · 資料來源:ESPN 公開 API</footer>
+  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.4 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -528,6 +528,107 @@ async function statsWithPrior(id,season,asOf,date,rows){
 function leagueRPG(pm){const v=Object.values(pm).filter(t=>t.rs!=null&&t.gp);
   return v.length?v.reduce((s,t)=>s+t.rs/t.gp,0)/v.length:null;}
 
+/* ---------- 全聯盟球員資料庫:30 隊全名單 + 每人本季數據,快取於裝置、每日背景更新 ---------- */
+const PDB_KEY='nba_pdb_v1';
+let PDB={ts:0,season:null,players:{},teams:{}};
+function loadPDB(){try{const x=JSON.parse(localStorage.getItem(PDB_KEY));if(x&&x.players)PDB=x;}catch(e){}}
+function savePDB(){try{localStorage.setItem(PDB_KEY,JSON.stringify(PDB));}catch(e){}}
+function pdbStale(){return !PDB.ts||(Date.now()-PDB.ts)>20*3600*1000||PDB.season!==seasonOf(etToday());}
+function pdbStat(id){const p=PDB.players[id];if(!p)return null;
+  return {gamesPlayed:p.gp,avgMinutes:p.min,avgPoints:p.pts,avgRebounds:p.reb,avgAssists:p.ast,avgSteals:p.stl,
+    avgBlocks:p.blk,avgTurnovers:p.to,fieldGoalPct:p.fg,threePointFieldGoalPct:p.p3,freeThrowPct:p.ft};}
+let pdbBuilding=false;
+async function buildPDB(onProg){
+  if(pdbBuilding)return;pdbBuilding=true;
+  try{
+    const td=await jget(`${SB}/teams?limit=40`);
+    const list=(((((td.sports||[])[0]||{}).leagues||[])[0]||{}).teams||[]).map(t=>t.team).filter(t=>t&&t.id);
+    const next={ts:Date.now(),season:seasonOf(etToday()),players:{},teams:{}};
+    for(let i=0;i<list.length;i++){
+      const t=list[i];
+      if(onProg)onProg(i+1,list.length,t.abbreviation);
+      try{
+        const r=await jget(`${SB}/teams/${t.id}/roster`);
+        const ath=(r.athletes||[]).filter(a=>a&&a.id);
+        next.teams[t.id]={id:+t.id,ab:t.abbreviation,n:t.displayName,roster:ath.map(a=>+a.id)};
+        const ovs=await Promise.allSettled(ath.map(a=>jget(`${CORE}/athletes/${a.id}/overview`)));
+        ath.forEach((a,j)=>{
+          const m=ovs[j].status==='fulfilled'?ovStats(ovs[j].value):null;
+          const pk=(...k)=>{if(!m)return null;for(const x of k)if(m[x]!=null)return m[x];return null;};
+          next.players[a.id]={id:+a.id,n:a.displayName,tid:+t.id,tm:t.abbreviation,pos:a.position?.abbreviation||'',
+            age:a.age||null,j:a.jersey||'',gp:pk('gamesPlayed'),min:pk('avgMinutes'),pts:pk('avgPoints'),reb:pk('avgRebounds'),
+            ast:pk('avgAssists'),stl:pk('avgSteals'),blk:pk('avgBlocks'),to:pk('avgTurnovers'),
+            fg:pk('fieldGoalPct'),p3:pk('threePointFieldGoalPct','threePointPct'),ft:pk('freeThrowPct')};
+        });
+      }catch(e){}
+    }
+    if(Object.keys(next.players).length>=200){PDB=next;savePDB();}
+  }catch(e){}
+  pdbBuilding=false;
+}
+loadPDB();
+function pdbProgEl(){let el=document.getElementById('pdbProg');
+  if(!el){el=document.createElement('div');el.id='pdbProg';el.className='tag';el.style.marginTop='4px';$('status').after(el);}
+  return el;}
+async function maybeBuildPDB(){
+  if(!pdbStale())return;
+  const el=pdbProgEl();
+  await buildPDB((i,n,ab)=>{el.textContent=`🗂 建立全聯盟球員資料庫 ${i}/${n} 隊(${ab})…背景進行,不影響瀏覽`;});
+  el.textContent=PDB.ts?`🗂 球員資料庫已更新:${Object.keys(PDB.players).length} 名球員 · ${Object.keys(PDB.teams).length} 隊`:'';
+  setTimeout(()=>{el.textContent='';},15000);
+}
+
+/* ---------- 每場球員數據入紀錄簿:終場後抓 box score,記下兩隊上場球員(分鐘、得分、籃板、助攻、+/-) ---------- */
+async function capturePlayerLines(maxN){
+  const L=ledger();const cut=shiftDate(etToday(),-12);
+  const todo=L.filter(e=>!e.pl&&e.d>=cut).slice(-(maxN||60));
+  if(!todo.length)return 0;
+  let n=0;
+  for(const e of todo){
+    try{
+      const d=await jget(`${SB}/summary?event=${e.id}`);
+      const hc=((d.header||{}).competitions||[])[0]||{};
+      const hC=(hc.competitors||[]).find(x=>x.homeAway==='home'),aC=(hc.competitors||[]).find(x=>x.homeAway==='away');
+      const homeId=hC&&hC.team?+hC.team.id:0,awayId=aC&&aC.team?+aC.team.id:0;
+      const side=tp=>{const st=(tp.statistics||[])[0];if(!st)return null;const lb=st.labels||st.names||[];
+        const mi=lb.indexOf('MIN'),pi=lb.indexOf('PTS'),ri=lb.indexOf('REB'),ai=lb.indexOf('AST'),pmi=lb.indexOf('+/-');
+        return (st.athletes||[]).filter(a=>a.athlete&&!a.didNotPlay&&(a.stats||[]).length)
+          .map(a=>({id:+a.athlete.id,n:a.athlete.shortName||a.athlete.displayName,st:a.starter?1:0,
+            min:mi>=0?(+a.stats[mi]||0):0,pts:pi>=0?(+a.stats[pi]||0):0,reb:ri>=0?(+a.stats[ri]||0):0,
+            ast:ai>=0?(+a.stats[ai]||0):0,pm:pmi>=0?(+a.stats[pmi]||0):null}))
+          .sort((x,y)=>y.min-x.min).slice(0,10);};
+      const pl={};
+      ((d.boxscore||{}).players||[]).forEach(tp=>{const tid=+(tp.team?.id||0);const rows=side(tp);if(rows)pl[tid===homeId?'h':'a']=rows;});
+      if(pl.h||pl.a){e.pl=pl;e.hid=homeId;e.aid=awayId;n++;}
+    }catch(err){}
+  }
+  localStorage.setItem('nba_ledger',JSON.stringify(L));
+  return n;
+}
+
+/* ---------- 主力缺陣影響自學:紀錄簿裡「該隊前三得分手未上場」的比賽,殘差告訴我們每缺 1 分場均該折多少 ---------- */
+let INJ_F=0.35;
+function learnInjFactor(){
+  const L=ledger().filter(e=>e.pl&&e.pl.h&&e.pl.a&&e.hid&&e.aid);
+  let sum=0,pSum=0,n=0;
+  const coreOf={};
+  L.forEach(e=>{
+    [['h',1,e.hid],['a',-1,e.aid]].forEach(([sd,sg,tid])=>{
+      if(!coreOf[tid])coreOf[tid]=Object.values(PDB.players).filter(p=>p.tid===tid&&p.pts!=null).sort((a,b)=>b.pts-a.pts).slice(0,3);
+      const core=coreOf[tid];if(core.length<3)return;
+      const played=new Set(e.pl[sd].map(x=>x.id));
+      const absent=core.filter(p=>!played.has(p.id));
+      if(!absent.length)return;
+      sum+=sg*(e.am-e.m*MARGIN_K);pSum+=absent.reduce((a,p)=>a+p.pts,0);n++;
+    });
+  });
+  if(n<30)return {n,f:0.35,r:n?sum/n:0,learned:false};
+  const rBar=sum/n,pBar=Math.max(8,pSum/n);
+  const raw=-rBar/pBar;
+  const f=Math.max(0.15,Math.min(0.6,0.35+(raw-0.35)*0.5));
+  return {n,f:+f.toFixed(2),r:rBar,learned:true};
+}
+
 /* 傷兵名單(ESPN 官方,僅套用於今天以後的比賽——回測不套用,因為無法得知歷史傷兵) */
 let INJ={},INJ_READY=false;const injPts={};
 async function loadInjuries(teamIds){
@@ -542,6 +643,7 @@ async function loadInjuries(teamIds){
   const jobs=[];
   (teamIds||[]).forEach(tid=>{(map[tid]||[]).slice(0,6).forEach(x=>{
     if(!/out|day|question|doubt/i.test(x.status))return;
+    if(injPts[x.id]==null&&PDB.players[x.id]&&PDB.players[x.id].pts!=null)injPts[x.id]=PDB.players[x.id].pts;
     if(injPts[x.id]!=null){x.pts=injPts[x.id];return;}
     jobs.push(jget(`${CORE}/athletes/${x.id}/overview`)
       .then(o=>{const m=ovStats(o);x.pts=injPts[x.id]=(m&&m.avgPoints)||0;})
@@ -555,7 +657,7 @@ function injInfo(teamId){
   let adj=0;const names=[];
   list.forEach(x=>{
     const out=/out/i.test(x.status);
-    const f=out?0.35:(/day|question|doubt/i.test(x.status)?0.12:0);
+    const f=out?INJ_F:(/day|question|doubt/i.test(x.status)?INJ_F*0.35:0);
     if(!f)return;
     adj-=x.pts*f;names.push(`${x.name}(場均 ${x.pts} 分,${out?'確定缺陣':'出賽存疑'})`);
   });
@@ -894,6 +996,7 @@ async function loadDay(quiet){
     INJ_READY=false;
     if(date>=etToday()){
       st.textContent='載入 '+date+' …(讀取官方傷兵名單)';
+      try{INJ_F=learnInjFactor().f;}catch(e){INJ_F=0.35;}
       try{INJ=await loadInjuries(ids);INJ_READY=true;}catch(e){}
     }
     const seasById={};ids.forEach((id,i)=>seasById[id]=seas[i]||[]);
@@ -1034,9 +1137,13 @@ async function showTeam(teamId,teamName,fromPop){
     if(tinfo.abbreviation)$('teamTitle').innerHTML=`<img class="tlg" style="width:28px;height:28px;vertical-align:-6px" src="${teamLogo(tinfo.abbreviation)}" onerror="this.remove()"> `+esc(teamName||tinfo.displayName||'');
     const roster=d.athletes||[];
     if(!roster.length){$('roster').innerHTML='<div class="empty">查無名單。</div>';return;}
-    const ovs=await Promise.allSettled(roster.map(a=>jget(`${CORE}/athletes/${a.id}/overview`)));
     const statById={};
-    roster.forEach((a,i)=>{if(ovs[i].status==='fulfilled')statById[a.id]=ovStats(ovs[i].value);});
+    const missing=[];
+    roster.forEach(a=>{const st0=(!pdbStale()&&pdbStat(a.id))||null;if(st0)statById[a.id]=st0;else missing.push(a);});
+    if(missing.length){
+      const ovs=await Promise.allSettled(missing.map(a=>jget(`${CORE}/athletes/${a.id}/overview`)));
+      missing.forEach((a,i)=>{if(ovs[i].status==='fulfilled')statById[a.id]=ovStats(ovs[i].value);});
+    }
     const groups={'後衛':[],'前鋒':[],'中鋒':[],'其他':[]};
     roster.forEach(a=>{
       const ab=(a.position?.abbreviation||'').toUpperCase();
@@ -1070,6 +1177,21 @@ $('searchBox').addEventListener('input',()=>{
   clearTimeout(searchTimer);
   const q=$('searchBox').value.trim();
   if(q.length<2){$('searchResults').innerHTML='';return;}
+  const renderHits=hits=>{
+    $('searchResults').innerHTML=hits.length?hits.map(p=>`
+      <div class="sr-item" data-pid="${p.id}">
+        ${avatarImg(p.id,p.name,'sr-ava')}
+        <span class="pos">${esc(p.tag||'NBA')}</span>
+        <span>${esc(p.name)}</span><span class="tm">${esc(p.sub)}</span></div>`).join('')
+      :'<div class="empty">找不到符合的球員(請用英文姓名搜尋)。</div>';
+    document.querySelectorAll('.sr-item').forEach(el=>el.addEventListener('click',()=>{
+      $('searchResults').innerHTML='';$('searchBox').value='';showPlayer(+el.dataset.pid);}));
+  };
+  const ql=q.toLowerCase();
+  const local=Object.values(PDB.players).filter(p=>(p.n||'').toLowerCase().includes(ql))
+    .sort((a,b)=>(b.pts||0)-(a.pts||0)).slice(0,8)
+    .map(p=>({id:p.id,name:p.n,tag:p.tm,sub:`${p.pos}${p.pts!=null?` · 場均 ${p.pts} 分`:''}`}));
+  if(local.length){renderHits(local);return;}
   searchTimer=setTimeout(async()=>{
     try{
       $('searchResults').innerHTML='<div class="empty">搜尋中…</div>';
@@ -1084,15 +1206,7 @@ $('searchBox').addEventListener('input',()=>{
           items.push({id:+m[1],name:c.displayName||c.name||'?',sub:c.description||c.subtitle||''});
         });
       });
-      const hits=items.slice(0,8);
-      $('searchResults').innerHTML=hits.length?hits.map(p=>`
-        <div class="sr-item" data-pid="${p.id}">
-          ${avatarImg(p.id,p.name,'sr-ava')}
-          <span class="pos">NBA</span>
-          <span>${esc(p.name)}</span><span class="tm">${esc(p.sub)}</span></div>`).join('')
-        :'<div class="empty">找不到符合的球員(請用英文姓名搜尋)。</div>';
-      document.querySelectorAll('.sr-item').forEach(el=>el.addEventListener('click',()=>{
-        $('searchResults').innerHTML='';$('searchBox').value='';showPlayer(+el.dataset.pid);}));
+      renderHits(items.slice(0,8));
     }catch(e){$('searchResults').innerHTML=`<div class="empty">搜尋失敗:${esc(e.message)}</div>`;}
   },300);
 });
@@ -1458,6 +1572,13 @@ function renderCalibHist(){
       </table></div>
       <div class="tag" style="margin-top:6px">偏差已透過「逐隊偏差回饋」小幅計入新預測(阻尼 35%、上限 ±1.5 分),且只使用比賽日之前的紀錄。</div>`;
   }
+  const npl=Object.keys(PDB.players).length;
+  if(npl){
+    const withPl=L.filter(e=>e.pl).length;
+    const lf=learnInjFactor();
+    html+=`<div class="tag" style="margin-top:8px">🗂 球員資料庫:${npl} 名球員 · ${Object.keys(PDB.teams).length} 隊 · 更新於 ${new Date(PDB.ts).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})} · 紀錄簿已含球員數據 ${withPl} 場</div>
+      <div class="tag" style="margin-top:4px">主力缺陣自學:樣本 ${lf.n} 場${lf.n?`,缺陣時平均殘差 ${lf.r>=0?'+':''}${lf.r.toFixed(1)} 分`:''} → 傷兵折算係數 ${lf.f}${lf.learned?'(已由紀錄簿學得)':'(預設,滿 30 場後自動學習)'}</div>`;
+  }
   if(INJ_READY){
     const isum=[];
     Object.keys(INJ).forEach(tid=>{const x=injInfo(+tid);if(x.adj<0&&x.names.length)isum.push(`${x.names[0].split('(')[0]} 等(${x.adj} 分)`);});
@@ -1497,7 +1618,7 @@ async function collectSamples(days,prog){
         const p=predict(g,pm,lg,date);
         const mPre=p.raw_margin_pre??p.raw_margin;
         if(mPre==null){skipped++;return;}
-        samples.push({id:g.id,d:date,aw:g.away,hm:g.home,
+        samples.push({id:g.id,d:date,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,
           m:mPre,homeWon,actM:(g.homeScore??0)-(g.awayScore??0)});
       });
     }catch(e){}
@@ -1543,7 +1664,7 @@ async function autoCalibrate(){
       const sChanged=Math.abs(best-RUN_SIGMA)>0.01;
       if(sChanged){RUN_SIGMA=best;localStorage.setItem('nba_sigma',String(best));}
       const hit=hitRateOf(samples);
-      const total=mergeLedger(samples.map(x=>({id:x.id,d:x.d,aw:x.aw,hm:x.hm,
+      const total=mergeLedger(samples.map(x=>({id:x.id,d:x.d,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,
         m:+x.m.toFixed(2),am:x.actM,hit:((x.m>=0)===x.homeWon)?1:0})));
       pushCalibHist({d:etToday(),s:+RUN_SIGMA.toFixed(2),k:+MARGIN_K.toFixed(2),
         hit:+(hit*100).toFixed(1),n:samples.length});
@@ -1552,6 +1673,7 @@ async function autoCalibrate(){
     }else{
       st.textContent='今日自動校準:樣本不足,略過(休賽季或球季初屬正常)';
     }
+    try{const cn=await capturePlayerLines(60);if(cn)st.textContent+=` · 已記錄 ${cn} 場球員數據`;}catch(e){}
   }catch(e){}
   calibRunning=false;
 }
@@ -1691,7 +1813,17 @@ async function showStandings(fromPop){
         <tr><th>球隊(排名)</th><th>勝</th><th>敗</th><th>勝率</th><th>勝差</th><th>場均淨勝分</th><th>目前</th><th>近10場</th></tr>
         ${rows}</table></div>`;
     });
+    const P=Object.values(PDB.players).filter(p=>(p.gp||0)>=5);
+    if(P.length){
+      const tbl=(key,zh)=>{const top=[...P].sort((a,b)=>(b[key]||0)-(a[key]||0)).slice(0,10);
+        return `<div class="pos-group">球員排行 · ${zh}</div><div class="table-wrap"><table class="stat" style="min-width:300px">
+        <tr><th>#</th><th>球員</th><th>隊</th><th>${zh}</th></tr>
+        ${top.map((p,i)=>`<tr><td>${i+1}</td><td><span class="pnm" data-pid="${p.id}" style="cursor:pointer">${esc(p.n)}</span></td><td>${esc(p.tm)}</td><td><b>${p[key]}</b></td></tr>`).join('')}
+        </table></div>`;};
+      html+=tbl('pts','場均得分')+tbl('reb','場均籃板')+tbl('ast','場均助攻');
+    }
     $('standings').innerHTML=html||'<div class="empty">查無戰績資料。</div>';
+    bindPlayerClicks($('standings'));
     $('standTag').textContent='即時 · '+new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+'(台灣時間)';
     $('standings').querySelectorAll('.pnm[data-team]').forEach(el=>{
       el.addEventListener('click',()=>showTeam(+el.dataset.team,el.textContent.replace(/^\d+\.\s*/,'')));});
@@ -1845,7 +1977,7 @@ $('prevBtn').addEventListener('click',()=>{dp.value=shiftDate(dp.value,-1);loadD
 $('nextBtn').addEventListener('click',()=>{dp.value=shiftDate(dp.value,1);loadDay();});
 $('todayBtn').addEventListener('click',()=>{dp.value=etToday();loadDay();});
 dp.addEventListener('change',()=>loadDay());
-loadDay().then(()=>autoCalibrate());
+loadDay().then(()=>autoCalibrate()).then(()=>maybeBuildPDB());
 </script>
 </body>
 </html>
