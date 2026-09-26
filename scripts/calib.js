@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.6.1 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v1.6.2(賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -53,7 +53,7 @@ async function netFetch(url){
 const readJSON=(f,d)=>{try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch(e){return d;}};
 function etToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function shiftDate(d,n){const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
-const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;return o;};
+const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
 /* 依日期插入(保持紀錄簿時間順序,逐隊偏差才不會看錯場次) */
 function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+hi)>>1;if(arr[mid].d<=e.d)lo=mid+1;else hi=mid;}arr.splice(lo,0,e);}
 
@@ -64,6 +64,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const prev=readJSON(F_CALIB,{});
   if(!fs.existsSync(D_SEED))fs.mkdirSync(D_SEED);
   const meta=readJSON(F_META,{seasons:{}});
+  /* 紀錄簿規則版本:v2 = 賽季依日期推算 + 收錄無法預測的比賽(nm)。版本升級時所有賽季重掃一次,已收錄場次自動略過 */
+  const LEDGER_V=2;
+  if((meta.v||1)<LEDGER_V){for(const k of Object.keys(meta.seasons)){meta.seasons[k].complete=false;delete meta.seasons[k].fail;}meta.v=LEDGER_V;console.log('紀錄簿規則升級至 v'+LEDGER_V+':全部賽季重掃一次');}
   let LED=[];
   for(const f of fs.readdirSync(D_SEED)){if(/^ledger-\d{4}\.json$/.test(f))LED=LED.concat(readJSON(path.join(D_SEED,f),[]));}
   if(fs.existsSync(F_SEED_OLD)){LED=LED.concat(readJSON(F_SEED_OLD,[]));}
@@ -134,7 +137,8 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         const r=await W.samplesForDate(d);
         const fresh=[...r.samples].filter(x=>x.st!==1&&(x.sy||sy)===sy&&!have.has(String(x.id))).map(x=>{
           const e={id:String(x.id),d:x.d,sy:x.sy||sy,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,st:x.st,po:x.po?1:0,
-            m:+(+x.m).toFixed(2),am:x.actM,hit:((x.m>=0)===x.homeWon)?1:0};
+            m:+(+x.m).toFixed(2),am:x.actM,hit:x.nm?null:(((x.m>=0)===x.homeWon)?1:0)};
+          if(x.nm)e.nm=1;
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           return e;});
         if(fresh.length){fresh.forEach(e=>{have.add(e.id);insertSorted(LED,e);});added+=fresh.length;sAdd+=fresh.length;}
@@ -165,7 +169,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   console.log(`球員數據新增 ${plN} 場`);
 
   /* ---------- 3) 擬合 K / σ(例行賽、最近 FIT_DAYS 天,含阻尼;首次回補多輪收斂) ---------- */
-  const reg=LED.filter(e=>!e.po&&!e.nu);
+  const reg=LED.filter(e=>!e.po&&!e.nu&&!e.nm);
   const fitEnd=reg.length?reg[reg.length-1].d:null;
   const win=fitEnd?reg.filter(e=>e.d>shiftDate(fitEnd,-FIT_DAYS)):[];
   const samples=win.map(e=>({m:e.m,actM:e.am,homeWon:e.am>0}));
@@ -198,10 +202,10 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   while(hist.length>HIST_MAX)hist.shift();
   const bySy={};LED.forEach(e=>{(bySy[e.sy]=bySy[e.sy]||[]).push(e);});
   const seasons=Object.keys(bySy).map(Number).sort((a,b)=>a-b).map(sy=>{
-    const all=bySy[sy],rg=all.filter(e=>!e.po&&!e.nu);
-    return {s:sy,n:rg.length,po:all.filter(e=>e.po).length,nu:all.filter(e=>e.nu).length,
-      hit:rg.length?+(rg.filter(e=>e.hit).length/rg.length*100).toFixed(1):null,
-      mae:rg.length?+(rg.reduce((a,e)=>a+Math.abs(e.am-e.m*K),0)/rg.length).toFixed(1):null,
+    const all=bySy[sy],rg=all.filter(e=>!e.po&&!e.nu),rp=rg.filter(e=>!e.nm);
+    return {s:sy,n:rg.length,nm:rg.length-rp.length,po:all.filter(e=>e.po).length,nu:all.filter(e=>e.nu).length,
+      hit:rp.length?+(rp.filter(e=>e.hit).length/rp.length*100).toFixed(1):null,
+      mae:rp.length?+(rp.reduce((a,e)=>a+Math.abs(e.am-e.m*K),0)/rp.length).toFixed(1):null,
       pl:all.filter(e=>e.pl&&e.pl.h&&e.pl.a).length};});
   const health={games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
     fixed,added,errors,fitN:samples.length,pdb:pdbN,seasonsN:seasons.length,seasons,secs:Math.round((Date.now()-t0)/1000)};
