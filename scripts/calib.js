@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -263,6 +263,26 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   let PRMF=Object.assign({},DEF),coefF=null,KF=null;
   if(variant!=='old'&&finalTrain.length>=2000){const F=fitVariant(finalTrain,variant);if(F){PRMF=F.prm;coefF=F.coef;KF=F.K;}else variant='old';}
   PRMF.eff=(variant==='eff');
+  /* 季內時間刻度:以較早 5 季學、最近 4 季驗證,有改善才採用;最終以最近 8 季學 */
+  const firstD={};US.forEach(e=>{if(!e.po&&(!firstD[e.sy]||e.d<firstD[e.sy]))firstD[e.sy]=e.d;});
+  const phOf=e=>{const d=(Date.parse(e.d)-Date.parse(firstD[e.sy]))/864e5;return d<14?0:d<30?1:d<60?2:d<120?3:4;};
+  const learnPh=list=>{const K0=list.reduce((a,e)=>a+e.mp0*e.am,0)/list.reduce((a,e)=>a+e.mp0*e.mp0,0);
+    return [0,1,2,3,4].map(k=>{const g=list.filter(e=>phOf(e)===k);if(g.length<200)return 1;
+      const Kk=g.reduce((a,e)=>a+e.mp0*e.am,0)/g.reduce((a,e)=>a+e.mp0*e.mp0,0);return +Math.max(0.6,Math.min(1.4,Kk/K0)).toFixed(3);});};
+  const phVar=variant==='eff'?'eff':'pts';
+  US.forEach(e=>{e.mp0=preM(e,PRMF,phVar);});
+  const phTrain=US.filter(e=>e.sy>=seasonNow-9&&e.sy<=seasonNow-5),phTest=US.filter(e=>e.sy>=seasonNow-4&&e.sy<seasonNow);
+  let phAdopt=false,phEval=null;
+  if(phTrain.length>3000&&phTest.length>2000){
+    const m=learnPh(phTrain);const Kt=phTrain.reduce((a,e)=>a+e.mp0*e.am,0)/phTrain.reduce((a,e)=>a+e.mp0*e.mp0,0);
+    const m0=phTest.reduce((a,e)=>a+Math.abs(e.am-Kt*e.mp0),0)/phTest.length;
+    const m1=phTest.reduce((a,e)=>a+Math.abs(e.am-Kt*m[phOf(e)]*e.mp0),0)/phTest.length;
+    phEval={train:m,before:+m0.toFixed(3),after:+m1.toFixed(3)};phAdopt=m1<m0-0.005;
+  }
+  PRMF.ph=phAdopt?learnPh(US.filter(e=>e.sy>=seasonNow-8&&e.sy<seasonNow)):[1,1,1,1,1];
+  PRMF.ss=firstD[seasonNow]||null;
+  US.forEach(e=>{delete e.mp0;});
+  console.log(`季內時間刻度:${phAdopt?'採用':'不採用'}`,JSON.stringify(PRMF.ph),JSON.stringify(phEval));
   // 歷年主場優勢(每季只用基礎實力 + 常數迴歸)
   const hcaBySeason=Object.keys(bySeason).map(Number).sort((a,b)=>a-b).map(y=>{const R=ols(rowsOf(bySeason[y],'pts'),[0,1]);
     return R&&R.c[0]>0.3?{s:y,v:+R.c[1].toFixed(2)}:null;}).filter(Boolean);   /* 兩隊實力相同時,主隊平均多得幾分 */
@@ -281,7 +301,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       以 2023-25 學、2025-26 驗證:誤差 11.66→11.43,預測 85% 的比賽實際贏 84%) ---------- */
   const reg=LED.filter(e=>!e.po&&!e.nu&&!e.nm);
   const win=reg.filter(e=>e.mp!=null||Number.isFinite(e.m)).slice(-2500);
-  const samples=win.map(e=>({m:(e.mp??e.m),actM:e.am,homeWon:e.am>0}));
+  /* 分差刻度與季內時間乘數一起校準 */
+  const phM=e=>{if(!PRMF.ph||!firstD[e.sy])return 1;const d=(Date.parse(e.d)-Date.parse(firstD[e.sy]))/864e5;return PRMF.ph[d<14?0:d<30?1:d<60?2:d<120?3:4]||1;};
+  const samples=win.map(e=>({m:(e.mp??e.m)*phM(e),actM:e.am,homeWon:e.am>0}));
   let hit=null;
   if(samples.length>=300){
     const Kn=samples.reduce((a,x)=>a+x.m*x.actM,0)/samples.reduce((a,x)=>a+x.m*x.m,0);
@@ -332,7 +354,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       pl:all.filter(e=>e.pl&&e.pl.h&&e.pl.a).length};});
   const health={withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
     fixed,added,errors,fitN:samples.length,pdb:pdbN,seasonsN:seasons.length,seasons,secs:Math.round((Date.now()-t0)/1000)};
-  const fit={variant,prm:PRMF,K:KF,coef:coefF,trainN:finalTrain.length,win:WIN,bt,tot,hcaBySeason};
+  const fit={variant,prm:PRMF,K:KF,coef:coefF,trainN:finalTrain.length,win:WIN,bt,tot,hcaBySeason,phEval};
   const calib={k:K,sigma:S,injF:inj.f,inj,prm:PRMF,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
     last:LED.length?LED[LED.length-1].d:null,updated:new Date().toISOString(),window:FIT_DAYS,health};
   fs.writeFileSync(F_CALIB,JSON.stringify(calib));
