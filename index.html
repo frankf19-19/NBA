@@ -386,12 +386,15 @@
     </section>
   </div>
 
-  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 ESPN 可取得的全部賽季(1994-95 季起)比賽與每場球員數據,ESPN 缺比分的空殼場次自動排除;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.6.2 · 資料來源:ESPN 公開 API</footer>
+  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 ESPN 可取得的全部賽季(1994-95 季起)比賽與每場球員數據,ESPN 缺比分的空殼場次自動排除;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.7 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
 const SB='https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
 const CORE='https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba';
+/* 模型參數:預設值 = 原本寫死的數字;雲端以 4 萬場資料迴歸學習後覆寫(calib.json 的 prm),
+   eff=true 代表改用「節奏 × 攻守效率」作為基礎實力 */
+const PRM={hca:2.6,b2b:-1.6,r34:0.3,r5:-0.4,g4:-0.8,mo4:0.6,mo2:0.25,h2h:0.15,h2hCap:0.45,eff:false,src:'default'};
 const HOME_PT_BOOST=2.6;
 let RUN_SIGMA=parseFloat(localStorage.getItem('nba_sigma'))||11.5;
 let MARGIN_K=parseFloat(localStorage.getItem('nba_mk'))||1.0;
@@ -593,7 +596,20 @@ function parsePlayerLines(d){
       .sort((x,y)=>y.min-x.min).slice(0,10);};
   const pl={};
   ((d.boxscore||{}).players||[]).forEach(tp=>{const tid=+(tp.team?.id||0);const rows=side(tp);if(rows)pl[tid===homeId?'h':'a']=rows;});
-  return (pl.h||pl.a)?{pl,hid:homeId,aid:awayId}:null;
+  /* 球隊數據(算回合數用):[得分,出手,罰球,進攻籃板,失誤];舊賽季 turnovers 為 0,改用 totalTurnovers */
+  const ts={};
+  ((d.boxscore||{}).teams||[]).forEach(tb=>{
+    const tid=+(tb.team?.id||0);const st=tb.statistics||[];
+    const g=n=>{const x=st.find(z=>z.name===n);return x?x.displayValue:null;};
+    const pair=n=>{const v=g(n);const m=/(\d+)-(\d+)/.exec(v||'');return m?[+m[1],+m[2]]:null;};
+    const fg=pair('fieldGoalsMade-fieldGoalsAttempted'),ft=pair('freeThrowsMade-freeThrowsAttempted');
+    const orb=+g('offensiveRebounds'),tov=Math.max(+g('totalTurnovers')||0,+g('turnovers')||0);
+    const c=(hc.competitors||[]).find(x=>+(x.team?.id||0)===tid);const pts=c?+c.score:NaN;
+    if(fg&&ft&&isFinite(orb)&&isFinite(pts)&&pts>0)ts[tid===homeId?'h':'a']=[pts,fg[1],ft[1],orb,tov];
+  });
+  const out=(pl.h||pl.a)?{pl,hid:homeId,aid:awayId}:null;
+  if(out&&ts.h&&ts.a)out.ts=ts;
+  return out;
 }
 async function capturePlayerLines(maxN,since){
   const L=ledger();const cut=since||shiftDate(etToday(),-12);
@@ -628,7 +644,7 @@ function learnInjFactor(src){
       const core=coreOf[key];if(core.length<3)return;
       const played=new Set(e.pl[sd].map(x=>x.id));
       const absent=core.filter(p=>!played.has(p.id));
-      const resid=sg*(e.am-e.m*MARGIN_K);
+      const resid=sg*(e.am-(e.mp??e.m)*MARGIN_K);
       if(!absent.length){const b=base[key]=base[key]||{s:0,n:0};b.s+=resid;b.n++;return;}
       absRows.push({key,resid,pts:absent.reduce((a,p)=>a+p.pts,0)});
     });
@@ -640,6 +656,24 @@ function learnInjFactor(src){
   const raw=-rBar/pBar;
   const f=Math.max(0.15,Math.min(0.6,0.35+(raw-0.35)*0.5));
   return {n,f:+f.toFixed(2),r:rBar,learned:true};
+}
+
+/* ---------- 節奏與攻守效率:回合數 = 出手 − 進攻籃板 + 失誤 + 0.44 × 罰球(兩隊平均) ---------- */
+function possOf(t){return t[1]-t[3]+t[4]+0.44*t[2];}   // t=[得分,出手,罰球,進攻籃板,失誤]
+function effTable(date,season){
+  const T={};let lp=0,lpts=0,lg=0;
+  for(const e of ledger()){
+    if(!e.ts||!e.ts.h||!e.ts.a||e.po||e.nu||e.d>=date)continue;
+    if((e.sy||seasonOf(e.d))!==season)continue;
+    const ps=(possOf(e.ts.h)+possOf(e.ts.a))/2;if(!(ps>50&&ps<160))continue;
+    [[e.hid,e.ts.h[0],e.ts.a[0]],[e.aid,e.ts.a[0],e.ts.h[0]]].forEach(([tid,pf,pa])=>{
+      const x=T[tid]=T[tid]||{gp:0,poss:0,pf:0,pa:0};x.gp++;x.poss+=ps;x.pf+=pf;x.pa+=pa;});
+    lp+=ps*2;lpts+=e.ts.h[0]+e.ts.a[0];lg+=2;
+  }
+  if(lg<40)return null;
+  const out={lg:{r:100*lpts/lp,pace:lp/lg}};
+  for(const k of Object.keys(T)){const x=T[k];out[k]={gp:x.gp,or:100*x.pf/x.poss,dr:100*x.pa/x.poss,pace:x.poss/x.gp};}
+  return out;
 }
 
 /* 傷兵名單(ESPN 官方,僅套用於今天以後的比賽——回測不套用,因為無法得知歷史傷兵) */
@@ -686,7 +720,7 @@ function teamBias(name,beforeDate){
     if(beforeDate&&e.d>=beforeDate)continue;
     if(e.po||e.nu||e.nm)continue;
     let sgn=0;if(e.hm===name)sgn=1;else if(e.aw===name)sgn=-1;else continue;
-    sum+=sgn*(e.am-e.m*MARGIN_K);n++;
+    sum+=sgn*(e.am-(e.mp??e.m)*MARGIN_K);n++;
   }
   if(n<4)return {v:0,n};
   return {v:+Math.max(-1.5,Math.min(1.5,(sum/n)*0.35)).toFixed(2),n};
@@ -714,49 +748,64 @@ function predict(g,pm,lg,date){
   }
   const hOff=offense(hRS,H.rPFg),aOff=offense(aRS,A.rPFg);
   const hDef=defense(hRA,H.rPAg),aDef=defense(aRA,A.rPAg);
-  let expHome=(hOff.v/lg)*(aDef.v/lg)*lg+HOME_PT_BOOST,expAway=(aOff.v/lg)*(hDef.v/lg)*lg;
+  const baseH=(hOff.v/lg)*(aDef.v/lg)*lg,baseA=(aOff.v/lg)*(hDef.v/lg)*lg;
+  /* 節奏 × 攻守效率(需兩隊本季各 ≥8 場球隊數據) */
+  let effH=null,effA=null,effTxt='';
+  const EF=g._eff;
+  if(EF&&EF[g.homeId]&&EF[g.awayId]&&EF[g.homeId].gp>=8&&EF[g.awayId].gp>=8){
+    const X=EF[g.homeId],Y=EF[g.awayId],P=X.pace*Y.pace/EF.lg.pace;
+    effH=P*(X.or*Y.dr/EF.lg.r)/100;effA=P*(Y.or*X.dr/EF.lg.r)/100;
+    effTxt=`攻守效率:主隊每百回合得 ${r1(X.or)} 失 ${r1(X.dr)}、客隊得 ${r1(Y.or)} 失 ${r1(Y.dr)},預估本場約 ${r1(P)} 回合。`;
+  }
+  const useEff=PRM.eff&&effH!=null;
+  if(useEff)factors.push('節奏與攻守效率');
+  let expHome=(useEff?effH:baseH)+PRM.hca,expAway=(useEff?effA:baseA);
+  const P1=v=>(v>0?'+':'')+r1(v);
 
-  // 休息日 + 3-in-4 疲勞
-  const restAdj=t=>{if(t.rest==null)return null;
-    if(t.rest<=1)return -1.6;if(t.rest>=5)return -0.4;
-    if(t.rest===3||t.rest===4)return +0.3;return 0;};
-  let rH=restAdj(H),rA=restAdj(A);
-  const g4H=(H.g4||0)>=3,g4A=(A.g4||0)>=3;
-  if(g4H&&rH!=null)rH-=0.8;if(g4A&&rA!=null)rA-=0.8;
+  // 休息日 + 4 天 3 戰疲勞(各項分數由 PRM 決定)
+  const ind=t=>{if(t.rest==null)return null;
+    return {b2b:t.rest<=1?1:0,r34:(t.rest===3||t.rest===4)?1:0,r5:t.rest>=5?1:0,g4:(t.g4||0)>=3?1:0};};
+  const iH=ind(H),iA=ind(A);
+  const restVal=i=>i?(i.b2b*PRM.b2b+i.r34*PRM.r34+i.r5*PRM.r5+i.g4*PRM.g4):null;
+  const rH=restVal(iH),rA=restVal(iA);
   if(rH!=null)expHome+=rH;if(rA!=null)expAway+=rA;
-  const restWord=(t,g4)=>t.rest==null?'':(t.rest<=1?`背靠背,-1.6 分${g4?';且 4 天內第 4 戰再 -0.8 分':''}`:(g4?`4 天 3 戰疲勞,-0.8 分`:(t.rest>=5?`休 ${t.rest-1} 天偏久,-0.4 分`:(t.rest>=3?`休 ${t.rest-1} 天充足,+0.3 分`:`休 ${t.rest-1} 天正常`))));
+  const restWord=(t,i)=>!i?'':(i.b2b?`背靠背,${P1(PRM.b2b)} 分${i.g4?`;且密集賽程再 ${P1(PRM.g4)} 分`:''}`:(i.g4?`4 天 3 戰疲勞,${P1(PRM.g4)} 分`:(i.r5?`休 ${t.rest-1} 天偏久,${P1(PRM.r5)} 分`:(i.r34?`休 ${t.rest-1} 天充足,${P1(PRM.r34)} 分`:`休 ${t.rest-1} 天正常`))));
   let restTxt='';
   if(rH!=null||rA!=null){
     const seg=[];
-    if(rA!=null)seg.push(`${g.away}(${restWord(A,g4A)})`);
-    if(rH!=null)seg.push(`${g.home}(${restWord(H,g4H)})`);
+    if(rA!=null)seg.push(`${g.away}(${restWord(A,iA)})`);
+    if(rH!=null)seg.push(`${g.home}(${restWord(H,iH)})`);
     restTxt=`體能:${seg.join('、')}。`;factors.push('休息日/疲勞');
   }
 
-  // 連勝連敗氣勢
-  const moAdj=t=>{if(t.streak==null)return null;
-    if(t.streak>=4)return +0.6;if(t.streak<=-4)return -0.6;
-    if(t.streak>=2)return +0.25;if(t.streak<=-2)return -0.25;return 0;};
-  const mH=moAdj(H),mA=moAdj(A);
+  // 連勝連敗氣勢(若資料顯示無效,雲端會把 mo4/mo2 學成 0)
+  const moI=t=>t.streak==null?null:{m4:t.streak>=4?1:(t.streak<=-4?-1:0),m2:(t.streak>=2&&t.streak<=3)?1:((t.streak<=-2&&t.streak>=-3)?-1:0)};
+  const oH=moI(H),oA=moI(A);
+  const mH=oH?oH.m4*PRM.mo4+oH.m2*PRM.mo2:null,mA=oA?oA.m4*PRM.mo4+oA.m2*PRM.mo2:null;
   if(mH!=null)expHome+=mH;if(mA!=null)expAway+=mA;
   const stWord=x=>x>0?`${x}連勝`:x<0?`${-x}連敗`:'中止連續';
   let moTxt='';
-  if(mH!=null&&mA!=null){
+  if(mH!=null&&mA!=null&&(PRM.mo4||PRM.mo2)){
     moTxt=`氣勢:客隊${stWord(A.streak)}(近10場 ${A.l10}),主隊${stWord(H.streak)}(近10場 ${H.l10})`;
     const edge=mH-mA;
     moTxt+=Math.abs(edge)>=0.3?`,氣勢在${edge>0?g.home:g.away}(修正約 ${r1(Math.abs(edge))} 分)。`:',兩隊氣勢相當。';
     factors.push('連勝氣勢');
   }
 
-  // 本季對戰往績(小幅修正,克制效應)
-  let h2hTxt='';
+  // 本季對戰往績
+  let h2hTxt='',h2hRaw=0;
   if(g._h2h&&(g._h2h.hw+g._h2h.aw)>0){
-    const {hw,aw}=g._h2h;
-    const hAdj=Math.max(-0.45,Math.min(0.45,(hw-aw)*0.15));
+    const {hw,aw}=g._h2h;h2hRaw=Math.max(-3,Math.min(3,hw-aw));
+    const hAdj=Math.max(-PRM.h2hCap,Math.min(PRM.h2hCap,(hw-aw)*PRM.h2h));
     expHome+=hAdj/2;expAway-=hAdj/2;
-    h2hTxt=`對戰往績:本季交手主隊 ${hw} 勝 ${aw} 敗${Math.abs(hAdj)>=0.15?`,${hAdj>0?'主隊':'客隊'}略有心理與戰術優勢(±${r1(Math.abs(hAdj))} 分)`:''}。`;
-    factors.push('對戰往績');
+    if(PRM.h2h){h2hTxt=`對戰往績:本季交手主隊 ${hw} 勝 ${aw} 敗${Math.abs(hAdj)>=0.15?`,${hAdj>0?'主隊':'客隊'}略有優勢(±${r1(Math.abs(hAdj))} 分)`:''}。`;
+      factors.push('對戰往績');}
   }
+
+  /* 可供雲端學習的成分:基礎實力(得分制 b / 效率制 be)+ 各項指標(主減客) */
+  const dI=(k)=>((iH&&iH[k])||0)-((iA&&iA[k])||0);
+  const fvec={b:+(baseH-baseA).toFixed(2),be:effH!=null?+(effH-effA).toFixed(2):null,
+    x:[dI('b2b'),dI('r34'),dI('r5'),dI('g4'),(oH?oH.m4:0)-(oA?oA.m4:0),(oH?oH.m2:0)-(oA?oA.m2:0),h2hRaw]};
 
   // 傷兵修正(僅今天以後;ESPN 官方名單 + 缺陣者場均得分)
   let injTxt='',injH=null,injA=null;
@@ -797,12 +846,12 @@ function predict(g,pm,lg,date){
   if(hOff.usedRec||hDef.usedRec)recBits.push(`主隊近10場 得${r1(H.rPFg)} 失${r1(H.rPAg)}`);
   if(aOff.usedRec||aDef.usedRec)recBits.push(`客隊近10場 得${r1(A.rPFg)} 失${r1(A.rPAg)}`);
   if(recBits.length){why+=`近況已納入:${recBits.join('、')}。`;factors.unshift('近10場走勢');}
-  why+=priorTxt+restTxt+moTxt+h2hTxt+injTxt+biasTxt;
-  why+=`含主場 +${HOME_PT_BOOST} 分,修正後得分期望 ${expAway.toFixed(1)}:${expHome.toFixed(1)}(客:主),預期 ${fav} 贏約 ${r1(Math.abs(margin))} 分。`;
+  why+=priorTxt+(useEff?effTxt:'')+restTxt+moTxt+h2hTxt+injTxt+biasTxt;
+  why+=`含主場 ${P1(PRM.hca)} 分${PRM.src==='cloud'?'(由歷年資料學得)':''},修正後得分期望 ${expAway.toFixed(1)}:${expHome.toFixed(1)}(客:主),預期 ${fav} 贏約 ${r1(Math.abs(margin))} 分。`;
   if(Math.abs(margin)<2)why+=`分差不到 2 分,實質接近五五波。`;
   return {home_prob:hp,away_prob:1-hp,predicted_winner:fav,home_score_pred:hs,away_score_pred:as,
     exp_home:+expHome.toFixed(1),exp_away:+expAway.toFixed(1),
-    margin:Math.abs(margin),raw_margin:margin,raw_margin_pre:marginPre,why,factors,
+    margin:Math.abs(margin),raw_margin:margin,raw_margin_pre:marginPre,why,factors,f:fvec,
     injHit:!!(injTxt),restAdjusted:(rH!=null&&rA!=null),moAdjusted:(mH!=null&&mA!=null)};
 }
 function review(g,p){
@@ -1007,6 +1056,7 @@ async function loadDay(quiet){
     const seas=await Promise.all(ids.map(id=>fetchTeamSeason(id,season).catch(()=>[])));
     const pm={};await Promise.all(ids.map(async(id,i)=>{pm[id]=await statsWithPrior(id,season,asOf,date,seas[i]);}));
     const lg=leagueRPG(pm);
+    const EFF_DAY=effTable(date,season);
     INJ_READY=false;
     if(date>=etToday()){
       st.textContent='載入 '+date+' …(讀取官方傷兵名單)';
@@ -1027,6 +1077,7 @@ async function loadDay(quiet){
       const A=pm[g.awayId],H=pm[g.homeId];
       if(A&&A.gp&&!g.awayRec)g.awayRec=`${A.w}-${A.l}`;
       if(H&&H.gp&&!g.homeRec)g.homeRec=`${H.w}-${H.l}`;
+      g._eff=EFF_DAY;
       const p=predict(g,pm,lg,date);curPreds.push(p);
       const isSpecial=/postpon|suspend|cancel/i.test((g.detail||'')+(g.typeName||''));
       const isPre=g.stype===1;
@@ -1559,7 +1610,8 @@ async function loadCloud(){
     const r=await fetch('calib.json?t='+Date.now(),{cache:'no-store'});
     if(r.ok){const c=await r.json();
       if(c&&isFinite(c.k)&&isFinite(c.sigma)){CLOUD=c;
-        if(cloudFresh()){MARGIN_K=+c.k;RUN_SIGMA=+c.sigma;if(isFinite(c.injF))INJ_F=+c.injF;}}}
+        if(cloudFresh()){MARGIN_K=+c.k;RUN_SIGMA=+c.sigma;if(isFinite(c.injF))INJ_F=+c.injF;
+          if(c.prm&&isFinite(c.prm.hca)){Object.assign(PRM,c.prm);PRM.src='cloud';}}}}
   }catch(e){}
   try{
     const r=await fetch('pdb.json?t='+Date.now(),{cache:'no-store'});
@@ -1608,6 +1660,32 @@ function renderCalibHist(){
     const hh=CLOUD.health||{};
     html=`<div class="tag" style="margin-top:8px;color:var(--teal)">☁️ 雲端校準${cloudFresh()?'':'(已逾 36 小時,暫以本機校準)'}:K=${(+CLOUD.k).toFixed(2)} · σ=${(+CLOUD.sigma).toFixed(2)} · 紀錄簿 ${hh.games??(CLOUD.ledger||[]).length} 場(例行賽 ${hh.reg??'-'}、季後賽 ${hh.po??'-'})· 最後比賽日 ${esc(CLOUD.last||'-')} · 更新於 ${new Date(CLOUD.updated).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}${hh.fixed?` · 自我檢查修復 ${hh.fixed} 筆`:''}</div>`+html;
   }
+  if(CLOUD&&CLOUD.fit&&CLOUD.fit.bt){
+    const F=CLOUD.fit,lbl=y=>`${y-1}-${String(y).slice(2)}`;
+    const vn={old:'原本固定參數',pts:'學習參數',eff:'學習參數+攻守效率'};
+    const pr=F.prm||{};const fmt=v=>v==null?'-':((v>0?'+':'')+(+v).toFixed(2));
+    html+=`<div class="pos-group" style="margin-top:14px">模型參數(由 ${F.trainN||'-'} 場例行賽迴歸學得,目前採用:${vn[F.variant]||F.variant})</div>
+      <div class="table-wrap"><table class="stat" style="min-width:420px">
+      <tr><th>項目</th><th>原本</th><th>學得</th></tr>
+      <tr><td>主場優勢</td><td>+2.60</td><td>${fmt(pr.hca)}</td></tr>
+      <tr><td>背靠背</td><td>-1.60</td><td>${fmt(pr.b2b)}</td></tr>
+      <tr><td>休 2–3 天</td><td>+0.30</td><td>${fmt(pr.r34)}</td></tr>
+      <tr><td>休 4 天以上</td><td>-0.40</td><td>${fmt(pr.r5)}</td></tr>
+      <tr><td>4 天 3 戰</td><td>-0.80</td><td>${fmt(pr.g4)}</td></tr>
+      <tr><td>4 連勝以上</td><td>+0.60</td><td>${fmt(pr.mo4)}</td></tr>
+      <tr><td>2–3 連勝</td><td>+0.25</td><td>${fmt(pr.mo2)}</td></tr>
+      <tr><td>對戰往績(每場)</td><td>+0.15</td><td>${fmt(pr.h2h)}</td></tr>
+      </table></div>
+      <div class="tag" style="margin-top:4px">統計上不顯著(|t|<2)的項目自動歸零,即「沒效就拿掉」。</div>
+      <div class="pos-group" style="margin-top:14px">公平回測:每季只用前 ${F.win||4} 季學參數再預測該季(分差誤差,越低越好)</div>
+      <div class="table-wrap"><table class="stat" style="min-width:460px">
+      <tr><th>賽季</th><th>原本</th><th>學習參數</th><th>+攻守效率</th><th>命中率(原本 → 採用)</th></tr>
+      ${F.bt.slice().reverse().map(r=>`<tr><td>${lbl(r.s)}</td><td>${r.old.mae}</td><td>${r.pts.mae}</td><td>${r.eff.mae}</td><td>${r.old.hit}% → ${r[F.variant].hit}%</td></tr>`).join('')}
+      <tr><td><b>合計</b></td><td><b>${F.tot.old.mae}</b></td><td><b>${F.tot.pts.mae}</b></td><td><b>${F.tot.eff.mae}</b></td><td><b>${F.tot.old.hit}% → ${F.tot[F.variant].hit}%</b></td></tr>
+      </table></div>`;
+    if(Array.isArray(F.hcaBySeason)&&F.hcaBySeason.length)
+      html+=`<div class="tag" style="margin-top:6px">歷年主場優勢(分):${F.hcaBySeason.map(x=>`${lbl(x.s)} ${(+x.v).toFixed(1)}`).join(' · ')}</div>`;
+  }
   if(CLOUD&&CLOUD.health&&Array.isArray(CLOUD.health.seasons)&&CLOUD.health.seasons.length){
     const ssr=CLOUD.health.seasons.slice().reverse();
     const lbl=y=>`${y-1}-${String(y).slice(2)}`;
@@ -1652,6 +1730,7 @@ async function samplesForDate(date){
       const seas=await Promise.all(ids.map(id=>fetchTeamSeason(id,season).catch(()=>[])));
       const pm={};await Promise.all(ids.map(async(id,j)=>{pm[id]=await statsWithPrior(id,season,asOf,date,seas[j]);}));
       const lg=leagueRPG(pm);
+      const EFF=effTable(date,season);
       const rById={};ids.forEach((id,j)=>rById[id]=seas[j]||[]);
       games.forEach(g=>{
         let h2w=0,h2l=0;
@@ -1664,13 +1743,14 @@ async function samplesForDate(date){
         const homeWon=g.homeWin?true:(g.awayWin?false:(g.homeScore!=null&&g.awayScore!=null?g.homeScore>g.awayScore:null));
         if(homeWon==null)return;
         if(!(g.homeScore>0&&g.awayScore>0)||g.homeScore===g.awayScore)return; /* ESPN 缺比分的空殼場次(如 1999-00 季 23 場) */
+        g._eff=EFF;
         const p=predict(g,pm,lg,date);
         const mPre=p.raw_margin_pre??p.raw_margin;
         const nm=(mPre==null)?1:0; /* 無法預測(如新成軍球隊前 5 場):照樣收錄比賽與球員數據,但不入命中、校準與學習 */
         if(nm)skipped++;
         samples.push({id:g.id,d:date,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,
           st:g.stype,sy:season,po:(g.stype===3||g.stype===5)?1:0,nm,
-          m:nm?0:mPre,homeWon,actM:(g.homeScore??0)-(g.awayScore??0)});
+          m:nm?0:mPre,f:nm?null:p.f,homeWon,actM:(g.homeScore??0)-(g.awayScore??0)});
       });
     }
   }
