@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -276,19 +276,34 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   bt.forEach(r=>console.log(`  回測 ${r.s-1}-${String(r.s).slice(2)}  n=${r.n}  原本 ${r.old.mae}/${r.old.hit}%  學習 ${r.pts.mae}/${r.pts.hit}%  效率 ${r.eff.mae}/${r.eff.hit}%`));
   console.log('  合計',JSON.stringify(tot));
 
-  /* ---------- 3) 擬合 K / σ(例行賽、最近 FIT_DAYS 天,含阻尼;首次回補多輪收斂) ---------- */
+  /* ---------- 3) 擬合 K / σ:最近約兩個完整賽季的例行賽(2,500 場),直接求最佳值、不阻尼
+     (舊版只用最近 60 天,休賽季時剛好是季末擺爛期,K 被拉高到 1.12、勝率過度自信;
+      以 2023-25 學、2025-26 驗證:誤差 11.66→11.43,預測 85% 的比賽實際贏 84%) ---------- */
   const reg=LED.filter(e=>!e.po&&!e.nu&&!e.nm);
-  const fitEnd=reg.length?reg[reg.length-1].d:null;
-  const win=fitEnd?reg.filter(e=>e.d>shiftDate(fitEnd,-FIT_DAYS)):[];
+  const win=reg.filter(e=>e.mp!=null||Number.isFinite(e.m)).slice(-2500);
   const samples=win.map(e=>({m:(e.mp??e.m),actM:e.am,homeWon:e.am>0}));
   let hit=null;
-  if(samples.length>=30){
-    const rounds=(bootstrap||prmChanged)?6:1;
-    for(let i=0;i<rounds;i++){
-      const nk=W.bestK(samples);E(`MARGIN_K=${nk}`);
-      const b=W.bestSigma(samples,nk);E(`RUN_SIGMA=${b.best}`);
-    }
+  if(samples.length>=300){
+    const Kn=samples.reduce((a,x)=>a+x.m*x.actM,0)/samples.reduce((a,x)=>a+x.m*x.m,0);
+    const Kc=Math.max(0.5,Math.min(1.5,Kn));
+    let Sb=RUN0(),bb=Infinity;
+    for(let sg=8;sg<=16.001;sg+=0.25){const v=E('brierFor')(samples,sg,Kc);if(v<bb){bb=v;Sb=sg;}}
+    E(`MARGIN_K=${+Kc.toFixed(3)};RUN_SIGMA=${Sb}`);
     hit=E('hitRateOf')(samples);
+  }
+  function RUN0(){return +E('RUN_SIGMA');}
+  /* 逐隊偏差回饋:以最近三季模擬「開 vs 關」,有降低誤差才啟用 */
+  {
+    const recent=reg.filter(e=>e.mp!=null&&e.sy>=seasonNow-3);
+    const Kc=+E('MARGIN_K');const hist={};let a0=0,a1=0,nb=0;
+    for(const e of recent){
+      const bias=nm=>{const h=hist[nm]||[];if(h.length<4)return 0;const k=Math.min(12,h.length);const v=h.slice(-k).reduce((s,x)=>s+x,0)/k*0.35;return Math.max(-1.5,Math.min(1.5,v));};
+      const base=Kc*e.mp;
+      if(e.sy>=seasonNow-2){const adj=(bias(e.hm)-bias(e.aw))/2;a0+=Math.abs(e.am-base);a1+=Math.abs(e.am-(base+adj));nb++;}
+      const r=e.am-base;(hist[e.hm]=hist[e.hm]||[]).push(r);(hist[e.aw]=hist[e.aw]||[]).push(-r);
+    }
+    PRMF.tb=nb>500&&a1<a0-0.005;
+    console.log(`逐隊偏差回饋:關 ${nb?(a0/nb).toFixed(3):'-'} / 開 ${nb?(a1/nb).toFixed(3):'-'} → ${PRMF.tb?'啟用':'停用'}`);
   }
   const K=+(+E('MARGIN_K')).toFixed(2),S=+(+E('RUN_SIGMA')).toFixed(2);
 
