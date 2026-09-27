@@ -386,7 +386,7 @@
     </section>
   </div>
 
-  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 ESPN 可取得的全部賽季(1994-95 季起)比賽與每場球員數據,ESPN 缺比分的空殼場次自動排除;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.7 · 資料來源:ESPN 公開 API</footer>
+  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 ESPN 可取得的全部賽季(1994-95 季起)比賽與每場球員數據,ESPN 缺比分的空殼場次自動排除;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.7.1 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -407,6 +407,8 @@ function erf(x){const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);
 const normCdf=z=>0.5*(1+erf(z/Math.SQRT2));
 const log5=(pa,pb)=>{const d=pa+pb-2*pa*pb;return d===0?0.5:(pa-pa*pb)/d;};
 function etToday(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'})).toISOString().slice(0,10);}
+const ET_FMT=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+function etDateOf(iso){if(!iso)return '';if(iso.length<=10)return iso;const t=Date.parse(iso.length===17&&iso.endsWith('Z')?iso.replace('Z',':00Z'):iso);return isFinite(t)?ET_FMT.format(new Date(t)):iso.slice(0,10);}
 function shiftDate(ds,n){const d=new Date(ds+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 function taipeiTime(iso){try{return new Date(iso).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){return null;}}
 const dkey=d=>d.replace(/-/g,'');
@@ -472,7 +474,7 @@ function fetchTeamSeason(teamId,season){
           if(!me||!opp)return;
           const done=!!(c.status?.type?.completed);
           const num=s=>{if(s==null)return null;if(typeof s==='object')return s.value!=null?+s.value:(s.displayValue!=null?+s.displayValue:null);const v=+s;return isFinite(v)?v:null;};
-          rows.push({date:(e.date||'').slice(0,10),done,
+          rows.push({date:etDateOf(e.date),done,  /* ESPN 賽程時間是 UTC,美東晚場會跨日,必須換算成美東日期才能算對休息天數 */
             pf:num(me.score),pa:num(opp.score),
             won:me.winner===true,oppId:+(opp.id||opp.team?.id||0),
             home:me.homeAway==='home'});
