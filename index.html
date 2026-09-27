@@ -386,7 +386,7 @@
     </section>
   </div>
 
-  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 ESPN 可取得的全部賽季(1994-95 季起)比賽與每場球員數據,ESPN 缺比分的空殼場次自動排除;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.7.2 · 資料來源:ESPN 公開 API</footer>
+  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 ESPN 可取得的全部賽季(1994-95 季起)比賽與每場球員數據,ESPN 缺比分的空殼場次自動排除;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.8 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -394,7 +394,18 @@ const SB='https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
 const CORE='https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba';
 /* 模型參數:預設值 = 原本寫死的數字;雲端以 4 萬場資料迴歸學習後覆寫(calib.json 的 prm),
    eff=true 代表改用「節奏 × 攻守效率」作為基礎實力 */
-const PRM={hca:2.6,b2b:-1.6,r34:0.3,r5:-0.4,g4:-0.8,mo4:0.6,mo2:0.25,h2h:0.15,h2hCap:0.45,eff:false,tb:true,src:'default'};
+const PRM={hca:2.6,b2b:-1.6,r34:0.3,r5:-0.4,g4:-0.8,mo4:0.6,mo2:0.25,h2h:0.15,h2hCap:0.45,eff:false,tb:true,
+  ph:[1,1,1,1,1],ss:null,src:'default'};
+/* 季內時間刻度:開季第 0–13 / 14–29 / 30–59 / 60–119 / 120+ 天,各段分差乘數(雲端由歷年資料學得;預設 1 = 不調整)
+   實測:開季前兩週預測過於極端(0.76)、季末偏保守(1.11) */
+function phaseMult(date){
+  if(!date||!Array.isArray(PRM.ph))return 1;
+  const sy=seasonOf(date);
+  const st=(PRM.ss&&seasonOf(PRM.ss)===sy)?PRM.ss:`${sy-1}-10-22`;
+  const d=daysBetween(st,date);
+  const k=d<14?0:d<30?1:d<60?2:d<120?3:4;
+  const m=+PRM.ph[k];return isFinite(m)&&m>0?m:1;
+}
 /* 顯示用:參數換算成實際分數(內部參數 × 分差刻度 K) */
 const PTS=v=>{const x=v*MARGIN_K;return (x>0?'+':'')+r1(x);};
 const HOME_PT_BOOST=2.6;
@@ -658,7 +669,8 @@ function learnInjFactor(src){
   if(n<30)return {n,f:0.35,r:n?sum/n:0,learned:false};
   const rBar=sum/n,pBar=Math.max(8,pSum/n);
   const raw=-rBar/pBar;
-  const f=Math.max(0.15,Math.min(0.6,0.35+(raw-0.35)*0.5));
+  /* 舊版固定往 0.35 拉回一半,結果永遠卡在中間(0.21,約為實際的 2 倍);樣本數上萬不需拉回 */
+  const f=Math.max(0.02,Math.min(0.6,raw/Math.max(0.5,MARGIN_K)));
   return {n,f:+f.toFixed(2),r:rBar,learned:true};
 }
 
@@ -825,7 +837,7 @@ function predict(g,pm,lg,date){
   }
 
   const marginPre=expHome-expAway;
-  const mid=(expHome+expAway)/2,half=marginPre/2*MARGIN_K;
+  const mid=(expHome+expAway)/2,half=marginPre/2*MARGIN_K*phaseMult(date);
   expHome=mid+half;expAway=mid-half;
 
   // 逐隊偏差修正(從紀錄簿學習,套在 K 之後)
