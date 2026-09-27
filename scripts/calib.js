@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -53,7 +53,7 @@ async function netFetch(url){
 const readJSON=(f,d)=>{try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch(e){return d;}};
 function etToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function shiftDate(d,n){const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
-const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
+const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
 /* 依日期插入(保持紀錄簿時間順序,逐隊偏差才不會看錯場次) */
 function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+hi)>>1;if(arr[mid].d<=e.d)lo=mid+1;else hi=mid;}arr.splice(lo,0,e);}
 
@@ -65,8 +65,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   if(!fs.existsSync(D_SEED))fs.mkdirSync(D_SEED);
   const meta=readJSON(F_META,{seasons:{}});
   /* 紀錄簿規則版本:v2 = 賽季依日期推算 + 收錄無法預測的比賽(nm)。版本升級時所有賽季重掃一次,已收錄場次自動略過 */
-  const LEDGER_V=2;
-  if((meta.v||1)<LEDGER_V){for(const k of Object.keys(meta.seasons)){meta.seasons[k].complete=false;delete meta.seasons[k].fail;}meta.v=LEDGER_V;console.log('紀錄簿規則升級至 v'+LEDGER_V+':全部賽季重掃一次');}
+  const LEDGER_V=3;   /* v3 = 每場補記預測成分 f 與球隊數據 ts(供參數學習與攻守效率) */
+  const upgrading=(meta.v||1)<LEDGER_V;
+  if(upgrading){for(const k of Object.keys(meta.seasons)){meta.seasons[k].complete=false;delete meta.seasons[k].fail;}meta.v=LEDGER_V;console.log('紀錄簿規則升級至 v'+LEDGER_V+':全部賽季重掃一次');}
   let LED=[];
   for(const f of fs.readdirSync(D_SEED)){if(/^ledger-\d{4}\.json$/.test(f))LED=LED.concat(readJSON(path.join(D_SEED,f),[]));}
   if(fs.existsSync(F_SEED_OLD)){LED=LED.concat(readJSON(F_SEED_OLD,[]));}
@@ -111,11 +112,30 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const before=d=>{let lo=0,hi=LED.length;while(lo<hi){const mid=(lo+hi)>>1;if(LED[mid].d<d)lo=mid+1;else hi=mid;}return lo;};
   const setCur=d=>{const i=before(d);CUR=LED.slice(Math.max(0,i-3000),i);};
 
+  /* ---------- 0) 球員數據 + 球隊數據(box score);掃描前先補,攻守效率才有資料可用 ---------- */
+  const fetchBox=async(label)=>{
+    const todo=LED.filter(e=>(!e.pl||!e.ts)&&!e.tsx);
+    let n=0;
+    for(let i=0;i<todo.length;i+=PL_BATCH){
+      await Promise.all(todo.slice(i,i+PL_BATCH).map(async e=>{
+        try{const r=W.parsePlayerLines(await W.jget(`${E('SB')}/summary?event=${e.id}`));
+          if(r){if(!e.pl)e.pl=JSON.parse(JSON.stringify(r.pl));e.hid=r.hid;e.aid=r.aid;
+            if(r.ts)e.ts=JSON.parse(JSON.stringify(r.ts));else e.tsx=1;n++;}
+          else e.tsx=1;}catch(err){}
+      }));
+      if(i&&i%1200===0)console.log(`${label} ${i}/${todo.length}`);
+    }
+    console.log(`${label}:處理 ${n}/${todo.length} 場`);
+  };
+  await fetchBox('box score(掃描前)');
+
   /* ---------- 1) 逐季、逐日回補(依時間順序,只新增不改寫;已封存賽季略過) ---------- */
   const seasonNow=+E(`seasonOf('${today}')`);
   let bootstrap=!LED.length;
   const have=new Set(LED.map(e=>e.id));
   const haveKey=new Set(LED.map(e=>e.d+'|'+e.hid+'|'+e.aid));
+  const byId=new Map(LED.map(e=>[String(e.id),e]));
+  let fAdded=0;
   let added=0,errors=0,days=0;
   for(let sy=FIRST_SEASON;sy<=seasonNow;sy++){
     const m=meta.seasons[sy]||{};
@@ -126,7 +146,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     const endWin=`${sy}-10-15`;
     /* 已結束卻未封存、且沒有失敗清單(舊版執行留下的):整季重掃一次,已收錄場次自動略過 */
     const rescan=endWin<yday&&m.games&&!Array.isArray(m.fail);
-    const start=process.env.BOOT_FROM||((lastInS&&!rescan)?shiftDate(lastInS,-2):`${sy-1}-10-01`);
+    const start=process.env.BOOT_FROM||((lastInS&&!rescan&&!upgrading)?shiftDate(lastInS,-2):`${sy-1}-10-01`);
     const end=endWin<yday?endWin:yday;
     const dates=[...retry];
     for(let d=start;d<=end;d=shiftDate(d,1))if(!dates.includes(d))dates.push(d);
@@ -138,13 +158,15 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       try{
         setCur(d);
         const r=await W.samplesForDate(d);
+        for(const x of r.samples){const ex=byId.get(String(x.id));if(ex&&!ex.f&&x.f){ex.f=JSON.parse(JSON.stringify(x.f));fAdded++;}}
         const fresh=[...r.samples].filter(x=>x.st!==1&&(x.sy||sy)===sy&&!have.has(String(x.id))&&!haveKey.has(x.d+'|'+x.hid+'|'+x.aid)).map(x=>{
           const e={id:String(x.id),d:x.d,sy:x.sy||sy,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,st:x.st,po:x.po?1:0,
             m:+(+x.m).toFixed(2),am:x.actM,hit:x.nm?null:(((x.m>=0)===x.homeWon)?1:0)};
           if(x.nm)e.nm=1;
+          if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           return e;});
-        if(fresh.length){fresh.forEach(e=>{have.add(e.id);haveKey.add(e.d+'|'+e.hid+'|'+e.aid);insertSorted(LED,e);});added+=fresh.length;sAdd+=fresh.length;}
+        if(fresh.length){fresh.forEach(e=>{have.add(e.id);haveKey.add(e.d+'|'+e.hid+'|'+e.aid);insertSorted(LED,e);byId.set(e.id,e);});added+=fresh.length;sAdd+=fresh.length;}
         return true;
       }catch(e){console.error(d,'失敗:',e.message);return false;}
     };
@@ -157,28 +179,108 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     meta.seasons[sy]={complete:(endWin<yday&&sErr===0&&n>0),games:n,checked:today,fail};
     console.log(`   新增 ${sAdd} 場,本季共 ${n} 場,錯誤 ${sErr}${sErr?`(${fail.join(', ')},下次優先重試)`:''}${meta.seasons[sy].complete?',已封存':''}`);
   }
-  console.log(`回補 ${days} 天,新增 ${added} 場,錯誤 ${errors},紀錄簿共 ${LED.length} 場`);
+  console.log(`回補 ${days} 天,新增 ${added} 場,補記成分 ${fAdded} 場,錯誤 ${errors},紀錄簿共 ${LED.length} 場`);
 
-  /* ---------- 2) 每場兩隊上場球員數據(box score) ---------- */
-  const todo=LED.filter(e=>!e.pl);
-  let plN=0;
-  for(let i=0;i<todo.length;i+=PL_BATCH){
-    await Promise.all(todo.slice(i,i+PL_BATCH).map(async e=>{
-      try{const r=W.parsePlayerLines(await W.jget(`${E('SB')}/summary?event=${e.id}`));
-        if(r){e.pl=JSON.parse(JSON.stringify(r.pl));e.hid=r.hid;e.aid=r.aid;plN++;}}catch(err){}
-    }));
-    if(i&&i%120===0)console.log(`球員數據 ${i}/${todo.length}`);
+  /* ---------- 2) 新增場次的 box score ---------- */
+  await fetchBox('box score(新增場次)');
+
+  /* ---------- 2.5) 參數學習與公平回測 ---------- */
+  const DEF={hca:2.6,b2b:-1.6,r34:0.3,r5:-0.4,g4:-0.8,mo4:0.6,mo2:0.25,h2h:0.15,h2hCap:0.45};
+  const XN=['b2b','r34','r5','g4','mo4','mo2','h2h'];
+  const baseOf=(e,v)=>v==='eff'?(e.f.be!=null?e.f.be:e.f.b):e.f.b;
+  const preM=(e,prm,v)=>{const x=e.f.x;let m=baseOf(e,v)+prm.hca;
+    for(let j=0;j<6;j++)m+=(prm[XN[j]]||0)*x[j];
+    m+=Math.max(-prm.h2hCap,Math.min(prm.h2hCap,x[6]*(prm.h2h||0)));return m;};
+  function solve(A,bv){const n=A.length;const M=A.map((r,i)=>[...r,bv[i]]);
+    for(let c=0;c<n;c++){let p=c;for(let r=c+1;r<n;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;
+      if(Math.abs(M[p][c])<1e-9)return null;[M[c],M[p]]=[M[p],M[c]];
+      for(let r=0;r<n;r++)if(r!==c){const f=M[r][c]/M[c][c];for(let k=c;k<=n;k++)M[r][k]-=f*M[c][k];}}
+    return M.map((r,i)=>r[n]/r[i]);}
+  function ols(rows,cols){ // rows: [{x:[...], y}],cols: 要用的欄位索引
+    const k=cols.length,A=Array.from({length:k},()=>new Array(k).fill(0)),bv=new Array(k).fill(0);
+    for(const r of rows){for(let a=0;a<k;a++){const xa=r.x[cols[a]];bv[a]+=xa*r.y;for(let b=0;b<k;b++)A[a][b]+=xa*r.x[cols[b]];}}
+    const c=solve(A,bv);if(!c)return null;
+    let rss=0;for(const r of rows){let p=0;for(let a=0;a<k;a++)p+=c[a]*r.x[cols[a]];rss+=(r.y-p)**2;}
+    const s2=rss/Math.max(1,rows.length-k);
+    const se=cols.map((_,a)=>{const e=new Array(k).fill(0);e[a]=1;const col=solve(A,e);return col?Math.sqrt(Math.max(0,s2*col[a])):Infinity;});
+    return {c,se,t:c.map((v,a)=>v/se[a])};}
+  // 設計矩陣:0=基礎實力,1=常數(主場優勢),2..8 = 各項指標(主減客)
+  const rowsOf=(list,v)=>list.map(e=>({x:[baseOf(e,v),1,...e.f.x],y:e.am}));
+  function fitVariant(list,v){
+    const rows=rowsOf(list,v);let cols=[0,1,2,3,4,5,6,7,8];
+    for(let it=0;it<8;it++){                     // 反覆剔除不顯著(|t|<2)的指標後重算
+      cols=cols.filter(ci=>ci<2||rows.some(r=>r.x[ci]!==0));
+      const R=ols(rows,cols);if(!R)return null;
+      const drop=cols.map((ci,a)=>({ci,t:R.t[a]})).filter(z=>z.ci>=2&&Math.abs(z.t)<2).sort((a,b)=>Math.abs(a.t)-Math.abs(b.t));
+      if(!drop.length){
+        const K=R.c[0];if(!(K>0.3))return null;
+        const prm={h2hCap:0};const coef={};
+        cols.forEach((ci,a)=>{coef[ci]={c:+R.c[a].toFixed(3),t:+R.t[a].toFixed(1)};});
+        prm.hca=Math.max(-1,Math.min(6,R.c[cols.indexOf(1)]/K));
+        XN.forEach((nm,j)=>{const a=cols.indexOf(j+2);prm[nm]=a<0?0:Math.max(-5,Math.min(5,R.c[a]/K));});
+        prm.h2hCap=Math.abs(prm.h2h)*3;
+        Object.keys(prm).forEach(k=>prm[k]=+(+prm[k]).toFixed(2));
+        return {K,prm,coef};}
+      cols=cols.filter(ci=>ci!==drop[0].ci);
+    }
+    return null;}
+  const usable=e=>e.f&&e.f.x&&!e.po&&!e.nu&&!e.nm&&Number.isFinite(e.am);
+  const Phi=z=>{const t=1/(1+0.2316419*Math.abs(z)),d=0.3989423*Math.exp(-z*z/2);const p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return z>0?1-p:p;};
+  function evalSet(test,fn,sig){let ae=0,h=0,br=0;for(const e of test){const pr=fn(e);ae+=Math.abs(e.am-pr);if((pr>=0)===(e.am>0))h++;
+      const pw=Math.max(.02,Math.min(.98,Phi(pr/sig)));br+=(pw-(e.am>0?1:0))**2;}
+    const n=test.length;return {mae:+(ae/n).toFixed(3),hit:+(h/n*100).toFixed(1),br:+(br/n).toFixed(4),n};}
+  const sigOf=(train,fn)=>Math.sqrt(train.reduce((a,e)=>a+(e.am-fn(e))**2,0)/train.length);
+  function variants(train){
+    const out={};
+    const pre0=train.map(e=>preM(e,DEF,'pts'));
+    const K0=pre0.reduce((a,p,i)=>a+p*train[i].am,0)/pre0.reduce((a,p)=>a+p*p,0);
+    out.old={fn:e=>K0*preM(e,DEF,'pts'),prm:DEF,K:K0};
+    for(const v of ['pts','eff']){const F=fitVariant(train,v);if(F)out[v]={fn:e=>F.K*preM(e,F.prm,v),prm:F.prm,K:F.K,coef:F.coef};}
+    return out;}
+  const US=LED.filter(usable);
+  const bySeason={};US.forEach(e=>{(bySeason[e.sy]=bySeason[e.sy]||[]).push(e);});
+  const WIN=4,bt=[];
+  const doneSeasons=Object.keys(bySeason).map(Number).filter(y=>y<seasonNow).sort((a,b)=>a-b);
+  for(const S of doneSeasons.slice(-10)){
+    const train=[];for(let y=S-WIN;y<S;y++)if(bySeason[y])train.push(...bySeason[y]);
+    const test=bySeason[S]||[];if(train.length<2000||test.length<300)continue;
+    const V=variants(train);if(!V.pts||!V.eff)continue;
+    const row={s:S,n:test.length};
+    for(const k of ['old','pts','eff'])row[k]=evalSet(test,V[k].fn,sigOf(train,V[k].fn));
+    bt.push(row);
   }
-  console.log(`球員數據新增 ${plN} 場`);
+  const tot={};
+  for(const k of ['old','pts','eff']){const n=bt.reduce((a,r)=>a+r.n,0);
+    tot[k]={mae:n?+(bt.reduce((a,r)=>a+r[k].mae*r.n,0)/n).toFixed(3):null,hit:n?+(bt.reduce((a,r)=>a+r[k].hit*r.n,0)/n).toFixed(1):null,
+      br:n?+(bt.reduce((a,r)=>a+r[k].br*r.n,0)/n).toFixed(4):null};}
+  let variant='old';
+  if(bt.length>=5){variant=['old','pts','eff'].reduce((b,k)=>tot[k].mae<tot[b].mae-0.005?k:b,'old');}
+  // 以最近 4 個完整賽季 + 本季資料學出最終參數
+  const finalTrain=[];for(let y=seasonNow-WIN;y<=seasonNow;y++)if(bySeason[y])finalTrain.push(...bySeason[y]);
+  let PRMF=Object.assign({},DEF),coefF=null,KF=null;
+  if(variant!=='old'&&finalTrain.length>=2000){const F=fitVariant(finalTrain,variant);if(F){PRMF=F.prm;coefF=F.coef;KF=F.K;}else variant='old';}
+  PRMF.eff=(variant==='eff');
+  // 歷年主場優勢(每季只用基礎實力 + 常數迴歸)
+  const hcaBySeason=Object.keys(bySeason).map(Number).sort((a,b)=>a-b).map(y=>{const R=ols(rowsOf(bySeason[y],'pts'),[0,1]);
+    return R&&R.c[0]>0.3?{s:y,v:+R.c[1].toFixed(2)}:null;}).filter(Boolean);   /* 兩隊實力相同時,主隊平均多得幾分 */
+  // 現行參數下每場的預期分差 mp(供 K/σ 校準、逐隊偏差與缺陣學習;當時的預測 m 保持凍結不改)
+  for(const e of LED){if(e.f&&e.f.x&&!e.nm)e.mp=+preM(e,PRMF,variant==='eff'?'eff':'pts').toFixed(2);else delete e.mp;}
+  const prevVar=(prev.fit&&prev.fit.variant)||'old';
+  const prmChanged=prevVar!==variant||JSON.stringify(prev.prm||{})!==JSON.stringify(PRMF);
+  if(prmChanged&&KF)E(`MARGIN_K=${KF}`);
+  E(`Object.assign(PRM,${JSON.stringify(PRMF)})`);
+  console.log(`參數學習:採用 ${variant}`,JSON.stringify(PRMF));
+  bt.forEach(r=>console.log(`  回測 ${r.s-1}-${String(r.s).slice(2)}  n=${r.n}  原本 ${r.old.mae}/${r.old.hit}%  學習 ${r.pts.mae}/${r.pts.hit}%  效率 ${r.eff.mae}/${r.eff.hit}%`));
+  console.log('  合計',JSON.stringify(tot));
 
   /* ---------- 3) 擬合 K / σ(例行賽、最近 FIT_DAYS 天,含阻尼;首次回補多輪收斂) ---------- */
   const reg=LED.filter(e=>!e.po&&!e.nu&&!e.nm);
   const fitEnd=reg.length?reg[reg.length-1].d:null;
   const win=fitEnd?reg.filter(e=>e.d>shiftDate(fitEnd,-FIT_DAYS)):[];
-  const samples=win.map(e=>({m:e.m,actM:e.am,homeWon:e.am>0}));
+  const samples=win.map(e=>({m:(e.mp??e.m),actM:e.am,homeWon:e.am>0}));
   let hit=null;
   if(samples.length>=30){
-    const rounds=bootstrap?6:1;
+    const rounds=(bootstrap||prmChanged)?6:1;
     for(let i=0;i<rounds;i++){
       const nk=W.bestK(samples);E(`MARGIN_K=${nk}`);
       const b=W.bestSigma(samples,nk);E(`RUN_SIGMA=${b.best}`);
@@ -210,9 +312,10 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       hit:rp.length?+(rp.filter(e=>e.hit).length/rp.length*100).toFixed(1):null,
       mae:rp.length?+(rp.reduce((a,e)=>a+Math.abs(e.am-e.m*K),0)/rp.length).toFixed(1):null,
       pl:all.filter(e=>e.pl&&e.pl.h&&e.pl.a).length};});
-  const health={games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
+  const health={withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
     fixed,added,errors,fitN:samples.length,pdb:pdbN,seasonsN:seasons.length,seasons,secs:Math.round((Date.now()-t0)/1000)};
-  const calib={k:K,sigma:S,injF:inj.f,inj,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
+  const fit={variant,prm:PRMF,K:KF,coef:coefF,trainN:finalTrain.length,win:WIN,bt,tot,hcaBySeason};
+  const calib={k:K,sigma:S,injF:inj.f,inj,prm:PRMF,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
     last:LED.length?LED[LED.length-1].d:null,updated:new Date().toISOString(),window:FIT_DAYS,health};
   fs.writeFileSync(F_CALIB,JSON.stringify(calib));
   for(const sy of Object.keys(bySy)){
