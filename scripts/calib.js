@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -65,8 +65,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   if(!fs.existsSync(D_SEED))fs.mkdirSync(D_SEED);
   const meta=readJSON(F_META,{seasons:{}});
   /* 紀錄簿規則版本:v2 = 賽季依日期推算 + 收錄無法預測的比賽(nm)。版本升級時所有賽季重掃一次,已收錄場次自動略過 */
-  const LEDGER_V=3;   /* v3 = 每場補記預測成分 f 與球隊數據 ts(供參數學習與攻守效率) */
-  const upgrading=(meta.v||1)<LEDGER_V;
+  const LEDGER_V=4;   /* v3 = 每場補記預測成分 f 與球隊數據 ts;v4 = 休息天數改用美東日期後重算成分 */
+  const prevV=meta.v||1;
+  const upgrading=prevV<LEDGER_V;
   if(upgrading){for(const k of Object.keys(meta.seasons)){meta.seasons[k].complete=false;delete meta.seasons[k].fail;}meta.v=LEDGER_V;console.log('紀錄簿規則升級至 v'+LEDGER_V+':全部賽季重掃一次');}
   let LED=[];
   for(const f of fs.readdirSync(D_SEED)){if(/^ledger-\d{4}\.json$/.test(f))LED=LED.concat(readJSON(path.join(D_SEED,f),[]));}
@@ -87,6 +88,8 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       if(seenKey.has(gk)){fixed++;continue;}
       seenKey.add(gk);seen.add(e.id);out.push(e);}
     LED=out.sort((a,b)=>a.d.localeCompare(b.d));}
+  /* v4:成分 f 以修正後的休息天數重算(f 是給學習用的衍生資料;當時的預測 m/am/hit 仍凍結不動) */
+  if(prevV<4){LED.forEach(e=>{delete e.f;delete e.mp;});console.log('成分 f 全部重算(休息天數改用美東日期)');}
 
   /* ---------- 載入網頁本身(雲端建置模式:不自動執行畫面流程) ---------- */
   const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
