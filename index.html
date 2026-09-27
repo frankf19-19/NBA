@@ -386,7 +386,7 @@
     </section>
   </div>
 
-  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 ESPN 可取得的全部賽季(1994-95 季起)比賽與每場球員數據,ESPN 缺比分的空殼場次自動排除;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.7.1 · 資料來源:ESPN 公開 API</footer>
+  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 ESPN 可取得的全部賽季(1994-95 季起)比賽與每場球員數據,ESPN 缺比分的空殼場次自動排除;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.7.2 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -394,7 +394,9 @@ const SB='https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
 const CORE='https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba';
 /* 模型參數:預設值 = 原本寫死的數字;雲端以 4 萬場資料迴歸學習後覆寫(calib.json 的 prm),
    eff=true 代表改用「節奏 × 攻守效率」作為基礎實力 */
-const PRM={hca:2.6,b2b:-1.6,r34:0.3,r5:-0.4,g4:-0.8,mo4:0.6,mo2:0.25,h2h:0.15,h2hCap:0.45,eff:false,src:'default'};
+const PRM={hca:2.6,b2b:-1.6,r34:0.3,r5:-0.4,g4:-0.8,mo4:0.6,mo2:0.25,h2h:0.15,h2hCap:0.45,eff:false,tb:true,src:'default'};
+/* 顯示用:參數換算成實際分數(內部參數 × 分差刻度 K) */
+const PTS=v=>{const x=v*MARGIN_K;return (x>0?'+':'')+r1(x);};
 const HOME_PT_BOOST=2.6;
 let RUN_SIGMA=parseFloat(localStorage.getItem('nba_sigma'))||11.5;
 let MARGIN_K=parseFloat(localStorage.getItem('nba_mk'))||1.0;
@@ -771,7 +773,8 @@ function predict(g,pm,lg,date){
   const restVal=i=>i?(i.b2b*PRM.b2b+i.r34*PRM.r34+i.r5*PRM.r5+i.g4*PRM.g4):null;
   const rH=restVal(iH),rA=restVal(iA);
   if(rH!=null)expHome+=rH;if(rA!=null)expAway+=rA;
-  const restWord=(t,i)=>!i?'':(i.b2b?`背靠背,${P1(PRM.b2b)} 分${i.g4?`;且密集賽程再 ${P1(PRM.g4)} 分`:''}`:(i.g4?`4 天 3 戰疲勞,${P1(PRM.g4)} 分`:(i.r5?`休 ${t.rest-1} 天偏久,${P1(PRM.r5)} 分`:(i.r34?`休 ${t.rest-1} 天充足,${P1(PRM.r34)} 分`:`休 ${t.rest-1} 天正常`))));
+  const eff1=(lbl,v)=>v?`${lbl},${PTS(v)} 分`:lbl;
+  const restWord=(t,i)=>!i?'':(i.b2b?`${eff1('背靠背',PRM.b2b)}${i.g4&&PRM.g4?`;且密集賽程再 ${PTS(PRM.g4)} 分`:''}`:(i.g4&&PRM.g4?`4 天 3 戰疲勞,${PTS(PRM.g4)} 分`:(i.r5?eff1(`休 ${t.rest-1} 天`,PRM.r5):(i.r34?eff1(`休 ${t.rest-1} 天`,PRM.r34):`休 ${t.rest-1} 天`))));
   let restTxt='';
   if(rH!=null||rA!=null){
     const seg=[];
@@ -826,7 +829,8 @@ function predict(g,pm,lg,date){
   expHome=mid+half;expAway=mid-half;
 
   // 逐隊偏差修正(從紀錄簿學習,套在 K 之後)
-  const bH=teamBias(g.home,date),bA=teamBias(g.away,date);
+  /* 雲端回測顯示無助益時(PRM.tb=false)不套用 */
+  const bH=PRM.tb===false?{v:0,n:0}:teamBias(g.home,date),bA=PRM.tb===false?{v:0,n:0}:teamBias(g.away,date);
   let biasTxt='';
   if(bH.v||bA.v){
     const shift=(bH.v-bA.v)/2;
@@ -849,7 +853,7 @@ function predict(g,pm,lg,date){
   if(aOff.usedRec||aDef.usedRec)recBits.push(`客隊近10場 得${r1(A.rPFg)} 失${r1(A.rPAg)}`);
   if(recBits.length){why+=`近況已納入:${recBits.join('、')}。`;factors.unshift('近10場走勢');}
   why+=priorTxt+(useEff?effTxt:'')+restTxt+moTxt+h2hTxt+injTxt+biasTxt;
-  why+=`含主場 ${P1(PRM.hca)} 分${PRM.src==='cloud'?'(由歷年資料學得)':''},修正後得分期望 ${expAway.toFixed(1)}:${expHome.toFixed(1)}(客:主),預期 ${fav} 贏約 ${r1(Math.abs(margin))} 分。`;
+  why+=`含主場 ${PTS(PRM.hca)} 分${PRM.src==='cloud'?'(由歷年資料學得)':''},修正後得分期望 ${expAway.toFixed(1)}:${expHome.toFixed(1)}(客:主),預期 ${fav} 贏約 ${r1(Math.abs(margin))} 分。`;
   if(Math.abs(margin)<2)why+=`分差不到 2 分,實質接近五五波。`;
   return {home_prob:hp,away_prob:1-hp,predicted_winner:fav,home_score_pred:hs,away_score_pred:as,
     exp_home:+expHome.toFixed(1),exp_away:+expAway.toFixed(1),
@@ -1038,7 +1042,7 @@ function buildDailySummary(date,games,preds,reviews,acc){
   }else if(!done.length){
     parts.push(`${date} 沒有排定的比賽。`);
   }
-  parts.push(`以上由兩隊得失分、近10場走勢、休息日與連勝氣勢計算而成,單場變異大,僅供追蹤參考。`);
+  parts.push(`以上由兩隊得失分、近10場走勢、主場優勢與背靠背等因素計算而成(各項影響由歷年資料學得),單場變異大,僅供追蹤參考。`);
   return parts.join('');
 }
 
