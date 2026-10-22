@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -33,6 +33,8 @@ const F_PDB=path.join(ROOT,'pdb.json');
 const FIT_DAYS=60;        // K/σ 擬合窗口(以最後一個有比賽的日期往回算)
 const HIST_MAX=120;
 const PL_BATCH=8;         // box score 併發數
+const BX_PER_RUN=+(process.env.BX_PER_RUN||2500);   // 每次執行回補完整原始資料的歷史場次上限(約 3~4 分鐘)
+const PDB_SNAP_DAYS=7;    // 球員資料庫快照間隔(天)
 
 /* ---------- 網路(可注入模擬器做離線測試) ---------- */
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -71,6 +73,10 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   if(upgrading){for(const k of Object.keys(meta.seasons)){meta.seasons[k].complete=false;delete meta.seasons[k].fail;}meta.v=LEDGER_V;console.log('紀錄簿規則升級至 v'+LEDGER_V+':全部賽季重掃一次');}
   let LED=[];
   for(const f of fs.readdirSync(D_SEED)){if(/^ledger-\d{4}\.json$/.test(f))LED=LED.concat(readJSON(path.join(D_SEED,f),[]));}
+  /* 賽前預測檔(本季):每場開打前記下含當日傷兵的預測,開打後凍結;入紀錄簿時附在 pg */
+  const seasonNow0=(+today.slice(5,7)>=8)?+today.slice(0,4)+1:+today.slice(0,4);
+  const F_PRE=path.join(D_SEED,`pregame-${seasonNow0}.json`);
+  const PRE=readJSON(F_PRE,{});
   if(fs.existsSync(F_SEED_OLD)){LED=LED.concat(readJSON(F_SEED_OLD,[]));}
   else if(!LED.length&&Array.isArray(prev.ledger))LED=prev.ledger.slice();
 
@@ -83,6 +89,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         e.am===0||   /* NBA 無和局:0 分差代表缺比分空殼 */
 !/^\d{4}-\d\d-\d\d$/.test(e.d||'')){fixed++;continue;}
       if(!e.sy)e.sy=(+e.d.slice(5,7)>=8)?+e.d.slice(0,4)+1:+e.d.slice(0,4);
+      if(e.hs==null&&e.ts&&e.ts.h&&e.ts.a){e.hs=e.ts.h[0];e.as=e.ts.a[0];}   /* 終場比分:舊資料由球隊數據補回 */
       if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1]){e.sy=2020;e.nu=1;}
       const gk=e.d+'|'+e.hid+'|'+e.aid;   /* ESPN 偶有同一場比賽登錄兩次(不同編號),同日同主客組合只留一筆 */
       if(seenKey.has(gk)){fixed++;continue;}
@@ -119,21 +126,30 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const setCur=d=>{const i=before(d);CUR=LED.slice(Math.max(0,i-3000),i);};
 
   /* ---------- 0) 球員數據 + 球隊數據(box score);掃描前先補,攻守效率才有資料可用 ---------- */
-  const fetchBox=async(label)=>{
-    const todo=LED.filter(e=>(!e.pl||!e.ts)&&!e.tsx);
+  /* 每場 box score 寫入紀錄簿:精簡版(pl/ts,模型學習用)+ 完整原始版(bx 全員全欄位、tst 球隊全部統計、ls 各節比分、hs/as 終場比分、場館/觀眾/開球時間)
+     ——完整版是我們自己的資料庫,不依賴 ESPN 日後還留不留 */
+  const applyBox=(e,r0)=>{const r=JSON.parse(JSON.stringify(r0));
+    if(!e.pl)e.pl=r.pl;if(r.hid>=1&&r.hid<=30&&r.aid>=1&&r.aid<=30){e.hid=r.hid;e.aid=r.aid;}
+    if(r.ts)e.ts=r.ts;else e.tsx=1;
+    if(r.bx)e.bx=r.bx;else e.bxx=1;
+    for(const k of ['tst','ls','hs','as','ven','att','tip'])if(r[k]!=null)e[k]=r[k];};
+  const fetchBox=async(label,list)=>{
+    const todo=list||LED.filter(e=>(!e.pl||!e.ts)&&!e.tsx);
     let n=0;
     for(let i=0;i<todo.length;i+=PL_BATCH){
       await Promise.all(todo.slice(i,i+PL_BATCH).map(async e=>{
         try{const r=W.parsePlayerLines(await W.jget(`${E('SB')}/summary?event=${e.id}`));
-          if(r){if(!e.pl)e.pl=JSON.parse(JSON.stringify(r.pl));e.hid=r.hid;e.aid=r.aid;
-            if(r.ts)e.ts=JSON.parse(JSON.stringify(r.ts));else e.tsx=1;n++;}
-          else e.tsx=1;}catch(err){}
+          if(r){applyBox(e,r);n++;}
+          else{e.tsx=1;e.bxx=1;}}catch(err){}
       }));
       if(i&&i%1200===0)console.log(`${label} ${i}/${todo.length}`);
     }
     console.log(`${label}:處理 ${n}/${todo.length} 場`);
   };
   await fetchBox('box score(掃描前)');
+  /* 歷史場次補齊完整原始資料:每次最多 BX_PER_RUN 場,由新到舊,幾週內自動補完 1994-95 季起全部 */
+  {const bk=LED.filter(e=>!e.bx&&!e.bxx).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,BX_PER_RUN);
+    if(bk.length)await fetchBox(`完整原始資料回補(剩 ${LED.filter(e=>!e.bx&&!e.bxx).length} 場)`,bk);}
 
   /* ---------- 1) 逐季、逐日回補(依時間順序,只新增不改寫;已封存賽季略過) ---------- */
   const seasonNow=+E(`seasonOf('${today}')`);
@@ -171,6 +187,8 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           if(x.nm)e.nm=1;
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
+          if(x.hs!=null){e.hs=x.hs;e.as=x.as;}
+          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at};   /* 賽前(含當日傷兵)預測,凍結 */
           return e;});
         if(fresh.length){fresh.forEach(e=>{have.add(e.id);haveKey.add(e.d+'|'+e.hid+'|'+e.aid);insertSorted(LED,e);byId.set(e.id,e);});added+=fresh.length;sAdd+=fresh.length;}
         return true;
@@ -345,6 +363,81 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     if(pdbN>=200)fs.writeFileSync(F_PDB,JSON.stringify(pdb));
   }catch(e){console.error('球員資料庫失敗:',e.message);}
 
+  /* ---------- 5.5) 自有資料庫:每日快照(傷兵名單、戰績榜、新聞)、球員資料庫週快照、賽前預測 ---------- */
+  const F_DAILY=path.join(D_SEED,`daily-${seasonNow}.json`);
+  const DAILY=readJSON(F_DAILY,{inj:{},st:{},news:{}});
+  const SBu=E('SB');
+  try{const d=await W.jget(`${SBu}/injuries`);
+    DAILY.inj[today]=(d.injuries||[]).flatMap(t=>(t.injuries||[]).map(x=>({t:+(t.id||t.team?.id||0),p:+(x.athlete?.id||0),n:x.athlete?.displayName||'',
+      s:x.status||x.type?.description||'',d:(x.shortComment||x.longComment||x.details?.detail||'').slice(0,160),dt:(x.date||'').slice(0,10)})));
+  }catch(e){console.error('傷兵快照失敗:',e.message);}
+  try{const d=await W.jget('https://site.api.espn.com/apis/v2/sports/basketball/nba/standings?level=2');const o={};
+    (d.children||[]).forEach(c=>((c.standings||{}).entries||[]).forEach(en=>{const g=n=>{const s=(en.stats||[]).find(x=>x.name===n);return s?(s.value!=null?+s.value:+s.displayValue):null;};
+      if(en.team&&en.team.id)o[en.team.id]=[g('wins'),g('losses'),g('pointDifferential')??g('differential'),g('streak'),(en.stats||[]).find(x=>/lastten|last ten|L10/i.test((x.name||'')+' '+(x.abbreviation||'')))?.displayValue||null];}));
+    if(Object.keys(o).length)DAILY.st[today]=o;
+  }catch(e){console.error('戰績快照失敗:',e.message);}
+  try{const d=await W.jget(`${SBu}/news?limit=30`);
+    DAILY.news[today]=(d.articles||[]).filter(a=>a.headline).map(a=>({h:a.headline,d:(a.description||'').slice(0,200),u:a.links?.web?.href||'',t:a.published||''}));
+  }catch(e){console.error('新聞快照失敗:',e.message);}
+  fs.writeFileSync(F_DAILY,JSON.stringify(DAILY));
+  /* 球員資料庫每 7 天存一份快照(每人:隊、出賽、分鐘、得分、籃板、助攻、抄截、火鍋、失誤、FG%、3P%、FT%) */
+  try{const F_PH=path.join(D_SEED,`pdbhist-${seasonNow}.json`);const PH=readJSON(F_PH,{});
+    const last=Object.keys(PH).sort().pop();
+    if(pdbN>=200&&(!last||(Date.parse(today)-Date.parse(last))/864e5>=PDB_SNAP_DAYS)){
+      const pdb=E('PDB');const o={};
+      Object.values(pdb.players||{}).forEach(p=>{o[p.id]=[p.tid,p.gp,p.min,p.pts,p.reb,p.ast,p.stl,p.blk,p.to,p.fg,p.p3,p.ft];});
+      PH[today]=o;fs.writeFileSync(F_PH,JSON.stringify(PH));console.log('球員資料庫快照',today,Object.keys(o).length,'人');}
+  }catch(e){console.error('球員資料庫快照失敗:',e.message);}
+  /* 賽前預測:今天與明天(美東)尚未開打的比賽,用目前參數 + 官方傷兵名單預測並記錄;開打後不再覆寫 */
+  let preN=0;
+  try{
+    E(`INJ_F=${+inj.f}`);
+    for(const d of [today,shiftDate(today,1)]){
+      const games=await W.fetchGames(d);
+      const live=games.filter(g=>g.status==='Preview'&&g.stype!==1&&g.homeId>=1&&g.homeId<=30&&g.awayId>=1&&g.awayId<=30);
+      if(!live.length)continue;
+      const season=+E(`seasonOf('${d}')`),asOf=shiftDate(d,-1);
+      const ids=[...new Set(live.flatMap(g=>[g.awayId,g.homeId]))];
+      const seas=await Promise.all(ids.map(id=>W.fetchTeamSeason(id,season).catch(()=>[])));
+      const pm={};await Promise.all(ids.map(async(id,i)=>{pm[id]=await W.statsWithPrior(id,season,asOf,d,seas[i]);}));
+      const lg=W.leagueRPG(pm);const EF=W.effTable(d,season);
+      W.__inj=await W.loadInjuries(ids);E('INJ=window.__inj;INJ_READY=true');
+      setCur(d);
+      for(const g of live){
+        let hw=0,aw=0;(seas[ids.indexOf(g.homeId)]||[]).forEach(r=>{if(r.done&&r.oppId===g.awayId&&r.pf!=null&&r.date<d){if(r.won)hw++;else aw++;}});
+        g._h2h={hw,aw};g._eff=EF;
+        const p=W.predict(g,pm,lg,d);if(p.raw_margin_pre==null)continue;
+        const ih=W.injInfo(g.homeId),ia=W.injInfo(g.awayId);
+        PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
+          hn:ih.names,an:ia.names,p:+p.home_prob.toFixed(3),k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString()};preN++;
+      }
+      E('INJ_READY=false');
+    }
+    /* 已入紀錄簿但當時沒附賽前預測的,補附 */
+    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at};}}
+    fs.writeFileSync(F_PRE,JSON.stringify(PRE));
+  }catch(e){console.error('賽前預測失敗:',e.message);}
+  console.log(`每日快照:傷兵 ${(DAILY.inj[today]||[]).length} 筆、戰績 ${Object.keys(DAILY.st[today]||{}).length} 隊、新聞 ${(DAILY.news[today]||[]).length} 則;賽前預測記錄 ${preN} 場`);
+
+  /* ---------- 5.6) 由「賽前真實傷兵名單」學傷兵係數:比 box score 推缺陣更準(含出賽存疑),
+       以前 60% 樣本學、後 40% 驗證,誤差有降才採用;樣本不足前沿用缺陣殘差法 ---------- */
+  let injPG=null;
+  {
+    const K=+E('MARGIN_K');
+    const rows=LED.filter(e=>e.pg&&e.mp!=null&&!e.po&&!e.nu&&!e.nm&&e.pg.f>0&&(e.pg.ih||e.pg.ia))
+      .map(e=>{const ph=phM(e);return {x:K*ph*(e.pg.ih-e.pg.ia)/e.pg.f,y:e.am-K*ph*e.mp};});
+    if(rows.length>=150){
+      const fit=rs=>{let xy=0,xx=0;rs.forEach(r=>{xy+=r.x*r.y;xx+=r.x*r.x;});return xx>0?xy/xx:0;};
+      const cut=Math.floor(rows.length*0.6),tr=rows.slice(0,cut),te=rows.slice(cut);
+      const fT=Math.max(0.02,Math.min(0.6,fit(tr)));
+      const mae=(rs,f)=>rs.reduce((a,r)=>a+Math.abs(r.y-f*r.x),0)/rs.length;
+      const m0=mae(te,inj.f),m1=mae(te,fT);
+      injPG={n:rows.length,f:+Math.max(0.02,Math.min(0.6,fit(rows))).toFixed(2),fTrain:+fT.toFixed(2),before:+m0.toFixed(3),after:+m1.toFixed(3),adopt:m1<m0-0.005};
+      if(injPG.adopt){inj.f=injPG.f;inj.src='pregame';inj.nPG=rows.length;}
+      console.log('賽前傷兵係數學習:',JSON.stringify(injPG));
+    }else console.log(`賽前傷兵係數學習:樣本 ${rows.length} 場,滿 150 場後啟用`);
+  }
+
   /* ---------- 6) 輸出 ---------- */
   const hist=(prev.hist||[]).filter(h=>h.d!==today);
   if(hit!=null)hist.push({d:today,s:S,k:K,hit:+(hit*100).toFixed(1),n:samples.length});
@@ -356,10 +449,10 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       hit:rp.length?+(rp.filter(e=>e.hit).length/rp.length*100).toFixed(1):null,
       mae:rp.length?+(rp.reduce((a,e)=>a+Math.abs(e.am-e.m*K),0)/rp.length).toFixed(1):null,
       pl:all.filter(e=>e.pl&&e.pl.h&&e.pl.a).length};});
-  const health={withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
+  const health={withBx:LED.filter(e=>e.bx).length,withPg:LED.filter(e=>e.pg).length,withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
     fixed,added,errors,fitN:samples.length,pdb:pdbN,seasonsN:seasons.length,seasons,secs:Math.round((Date.now()-t0)/1000)};
   const fit={variant,prm:PRMF,K:KF,coef:coefF,trainN:finalTrain.length,win:WIN,bt,tot,hcaBySeason,phEval};
-  const calib={k:K,sigma:S,injF:inj.f,inj,prm:PRMF,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
+  const calib={k:K,sigma:S,injF:inj.f,inj,injPG,prm:PRMF,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
     last:LED.length?LED[LED.length-1].d:null,updated:new Date().toISOString(),window:FIT_DAYS,health};
   fs.writeFileSync(F_CALIB,JSON.stringify(calib));
   for(const sy of Object.keys(bySy)){

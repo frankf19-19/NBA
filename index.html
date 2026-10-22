@@ -391,7 +391,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v1.9 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.0 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -636,6 +636,26 @@ function parsePlayerLines(d){
   });
   const out=(pl.h||pl.a)?{pl,hid:homeId,aid:awayId}:null;
   if(out&&ts.h&&ts.a)out.ts=ts;
+  if(!out)return null;
+  /* ---- 完整原始資料(自有資料庫用):全員完整 box score、各節比分、終場比分、球隊全部統計、場館與觀眾數 ---- */
+  const numOr=v=>{if(v==null||v==='')return null;const n=+v;return (isFinite(n)&&/^-?\d+(\.\d+)?$/.test(String(v).trim()))?n:String(v);};
+  const bx={};
+  ((d.boxscore||{}).players||[]).forEach(tp=>{const tid=+(tp.team?.id||0);const st=(tp.statistics||[])[0];if(!st)return;
+    const lb=st.labels||st.names||[];
+    bx[tid===homeId?'h':'a']={lb,p:(st.athletes||[]).filter(a=>a.athlete).map(a=>[+a.athlete.id,a.starter?1:0,a.didNotPlay?1:0,...(a.stats||[]).map(numOr)])};});
+  if(bx.h&&bx.a)out.bx=bx;
+  const tst={};
+  ((d.boxscore||{}).teams||[]).forEach(tb=>{const tid=+(tb.team?.id||0);const o={};
+    (tb.statistics||[]).forEach(z=>{if(z.name)o[z.name]=numOr(z.displayValue);});
+    if(Object.keys(o).length)tst[tid===homeId?'h':'a']=o;});
+  if(tst.h&&tst.a)out.tst=tst;
+  const lsOf=c=>(c&&c.linescores||[]).map(l=>numOr(l.displayValue!=null?l.displayValue:l.value));
+  const lh=lsOf(hC),la=lsOf(aC);if(lh.length&&la.length)out.ls={h:lh,a:la};
+  if(hC&&hC.score!=null&&aC&&aC.score!=null){out.hs=+hC.score;out.as=+aC.score;}
+  const gi=d.gameInfo||{};
+  if(gi.venue&&gi.venue.fullName)out.ven=gi.venue.fullName;
+  if(isFinite(+gi.attendance)&&+gi.attendance>0)out.att=+gi.attendance;
+  if(hc.date)out.tip=hc.date;
   return out;
 }
 async function capturePlayerLines(maxN,since){
@@ -1682,10 +1702,11 @@ function renderFooter(){
     ph,
     PRM.tb===false?'逐隊偏差回饋經回測無助益,目前停用':'逐隊偏差回饋(阻尼 35%、上限 ±1.5 分)',
     `K=${MARGIN_K.toFixed(2)}、σ=${RUN_SIGMA.toFixed(2)} 由近 2,500 場例行賽每日重新擬合`,
-    `開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿`
+    `開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿`,
+    `自有資料庫:每場完整 box score、各節比分與球隊統計,每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.9 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.0 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -1769,6 +1790,9 @@ function renderCalibHist(){
     const lf=cloudFresh()&&CLOUD.inj?CLOUD.inj:learnInjFactor();
     html+=`<div class="tag" style="margin-top:8px">🗂 球員資料庫:${npl} 名球員 · ${Object.keys(PDB.teams).length} 隊 · 更新於 ${new Date(PDB.ts).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})} · 紀錄簿已含球員數據 ${withPl} 場</div>
       <div class="tag" style="margin-top:4px">主力缺陣自學:樣本 ${lf.n} 場${lf.n?`,缺陣時平均殘差 ${lf.r>=0?'+':''}${lf.r.toFixed(1)} 分`:''} → 傷兵折算係數 ${lf.f}${lf.learned?'(已由紀錄簿學得)':'(預設,滿 30 場後自動學習)'}</div>`;
+    const hh2=(CLOUD&&CLOUD.health)||{},ipg=CLOUD&&CLOUD.injPG;
+    if(hh2.withBx!=null)html+=`<div class="tag" style="margin-top:4px">🗄 自有資料庫:完整 box score(全員全欄位、各節比分、球隊全部統計、場館與觀眾)${hh2.withBx} 場${hh2.withBx<hh2.games?`(歷史場次每日自動回補,剩 ${hh2.games-hh2.withBx} 場)`:'(全部賽季已補齊)'};賽前含傷兵預測 ${hh2.withPg??0} 場;每日另存官方傷兵名單、戰績榜、新聞與每週球員資料庫快照</div>
+      <div class="tag" style="margin-top:4px">賽前傷兵係數學習(以真實傷兵名單學,前 60% 學、後 40% 驗證):${ipg?`樣本 ${ipg.n} 場,學得 ${ipg.f},驗證誤差 ${ipg.before} → ${ipg.after},${ipg.adopt?'已採用':'未改善,沿用缺陣殘差法'}`:'樣本累積中,滿 150 場後啟用'}</div>`;
   }
   if(INJ_READY){
     const isum=[];
@@ -1818,7 +1842,7 @@ async function samplesForDate(date){
         if(nm)skipped++;
         samples.push({id:g.id,d:date,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,
           st:g.stype,sy:season,po:(g.stype===3||g.stype===5)?1:0,nm,
-          m:nm?0:mPre,f:nm?null:p.f,homeWon,actM:(g.homeScore??0)-(g.awayScore??0)});
+          m:nm?0:mPre,f:nm?null:p.f,homeWon,actM:(g.homeScore??0)-(g.awayScore??0),hs:g.homeScore,as:g.awayScore});
       });
     }
   }
