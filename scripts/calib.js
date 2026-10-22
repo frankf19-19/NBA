@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -55,7 +55,7 @@ async function netFetch(url){
 const readJSON=(f,d)=>{try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch(e){return d;}};
 function etToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function shiftDate(d,n){const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
-const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
+const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;}if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
 /* 依日期插入(保持紀錄簿時間順序,逐隊偏差才不會看錯場次) */
 function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+hi)>>1;if(arr[mid].d<=e.d)lo=mid+1;else hi=mid;}arr.splice(lo,0,e);}
 
@@ -118,6 +118,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   /* 掃描新場次前先套上目前生效的學習參數:紀錄簿凍結的 m 才會等於網站當天真正顯示的預測
      (舊版掃描時仍是寫死的預設參數,m 與網站不一致;mp 另以最新參數重算,不受影響) */
   if(prev.prm&&isFinite(prev.prm.hca))E(`Object.assign(PRM,${JSON.stringify(prev.prm)});PRM.src='cloud';`);
+  if(prev.mb&&Array.isArray(prev.mb.g))E(`MB=${JSON.stringify(prev.mb)}`);   /* 勝分差區間機率表(昨日學得),新場次的區間預測據此凍結 */
   /* 紀錄簿不放 localStorage(上限 500 萬字元,數萬場會爆):
      預測某日時,把「該日之前最近 3,000 場」直接交給網頁的 ledger(),逐隊偏差只需每隊最近 12 場,且不偷看未來 */
   let CUR=[];
@@ -184,6 +185,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         const fresh=[...r.samples].filter(x=>x.st!==1&&(x.sy||sy)===sy&&!have.has(String(x.id))&&!haveKey.has(x.d+'|'+x.hid+'|'+x.aid)).map(x=>{
           const e={id:String(x.id),d:x.d,sy:x.sy||sy,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,st:x.st,po:x.po?1:0,
             m:+(+x.m).toFixed(2),am:x.actM,hit:x.nm?null:(((x.m>=0)===x.homeWon)?1:0)};
+          if(x.mb!=null){e.mb=x.mb;e.mbp=x.mbp;e.mbh=(W.mbActualIdx(x.actM)===x.mb)?1:0;}   /* 勝分差區間預測與是否全中,凍結 */
           if(x.nm)e.nm=1;
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
@@ -351,6 +353,53 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   }
   const K=+(+E('MARGIN_K')).toFixed(2),S=+(+E('RUN_SIGMA')).toFixed(2);
 
+  /* ---------- 3.5) 勝分差區間機率表:看好方角度,|預測分差| 每 0.5 分一格,統計近 MB_WIN 季「實際落在 12 種結果」的比例;
+       與常態分布(σ=殘差標準差)做滾動回測,全中率較高者採用。分差近年明顯變大(26+ 比例 6%→12%),所以只用近幾季 ---------- */
+  const MB_WIN=4,MB_STEP=0.5,MB_MAX=30;
+  const Kn=+E('MARGIN_K');
+  const predOf=e=>Kn*e.mp*phM(e);
+  const bucketOf=a=>{a=Math.abs(a);return a<=5?0:a<=10?1:a<=15?2:a<=20?3:a<=25?4:5;};
+  const favIdx=(e,p)=>{const a=e.am*(p>=0?1:-1);return bucketOf(a)+(a>0?0:6);};
+  const homeIdx=e=>bucketOf(e.am)+(e.am>0?0:6);
+  const toHome=(i,p)=>p>=0?i:(i<6?i+6:i-6);
+  const mbRows=reg.filter(e=>e.mp!=null).map(e=>({e,p:predOf(e)}));
+  function mbTable(rows){
+    const xs=rows.map(r=>[Math.abs(r.p),favIdx(r.e,r.p)]).sort((a,b)=>a[0]-b[0]);const keys=xs.map(x=>x[0]);
+    const bl=v=>{let lo=0,hi=keys.length;while(lo<hi){const m=(lo+hi)>>1;if(keys[m]<v)lo=m+1;else hi=m;}return lo;};
+    const br=v=>{let lo=0,hi=keys.length;while(lo<hi){const m=(lo+hi)>>1;if(keys[m]<=v)lo=m+1;else hi=m;}return lo;};
+    const g=[];
+    for(let x=0;x<=MB_MAX+1e-9;x+=MB_STEP){
+      let w=1.5,lo=bl(x-w),hi=br(x+w);
+      while(hi-lo<300&&w<8){w+=1;lo=bl(x-w);hi=br(x+w);}
+      const cnt=new Array(12).fill(0);for(let i=lo;i<hi;i++)cnt[xs[i][1]]++;
+      const n=Math.max(1,hi-lo);g.push(cnt.map(c=>+(c/n).toFixed(4)));
+    }
+    return g;
+  }
+  const mbPickT=(g,p)=>{const pr=g[Math.min(g.length-1,Math.round(Math.abs(p)/MB_STEP))];let i=0;for(let k=1;k<12;k++)if(pr[k]>pr[i])i=k;return {i:toHome(i,p),pr:pr[i]};};
+  const mbPickN=(p,s)=>{const Phi2=z=>0.5*(1+erf2(z/Math.SQRT2));const mu=Math.abs(p);const ed=[[0.5,5.5],[5.5,10.5],[10.5,15.5],[15.5,20.5],[20.5,25.5],[25.5,1e9]];
+    let best=-1,bi=0,k=0;for(const sg of [1,-1])for(const [lo,hi] of ed){const a=sg>0?lo:-hi,b=sg>0?hi:-lo;const v=Phi2((b-mu)/s)-Phi2((a-mu)/s);if(v>best){best=v;bi=k;}k++;}
+    return toHome(bi,p);};
+  function erf2(x){const sg=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return sg*y;}
+  const mbBt=[];let mbTotE=0,mbTotN=0,mbTotn=0;
+  const mbSeasons=[...new Set(mbRows.map(r=>r.e.sy))].filter(y=>y<seasonNow).sort((a,b)=>a-b).slice(-8);
+  for(const S of mbSeasons){
+    const tr=mbRows.filter(r=>r.e.sy>=S-MB_WIN&&r.e.sy<S),te=mbRows.filter(r=>r.e.sy===S);
+    if(tr.length<2000||te.length<300)continue;
+    const g=mbTable(tr);const sig=Math.sqrt(tr.reduce((a,r)=>a+(r.e.am-r.p)**2,0)/tr.length);
+    let hE=0,hN=0,cl=0;for(const r of te){const ai=homeIdx(r.e);const t=mbPickT(g,r.p);if(t.i===ai)hE++;cl+=t.pr;if(mbPickN(r.p,sig)===ai)hN++;}
+    mbBt.push({s:S,n:te.length,emp:+(hE/te.length*100).toFixed(1),norm:+(hN/te.length*100).toFixed(1),claimed:+(cl/te.length*100).toFixed(1)});
+    mbTotE+=hE;mbTotN+=hN;mbTotn+=te.length;
+  }
+  const mbFinalRows=mbRows.filter(r=>r.e.sy>=seasonNow-MB_WIN);
+  const sigmaM=mbFinalRows.length?+Math.sqrt(mbFinalRows.reduce((a,r)=>a+(r.e.am-r.p)**2,0)/mbFinalRows.length).toFixed(2):S;
+  const mbUse=(mbTotn>=3000&&mbTotE>mbTotN)?'emp':'norm';
+  const MBT={use:mbUse,step:MB_STEP,win:MB_WIN,sigmaM,g:mbFinalRows.length>=2000?mbTable(mbFinalRows):[],
+    bt:mbBt,tot:{emp:mbTotn?+(mbTotE/mbTotn*100).toFixed(2):null,norm:mbTotn?+(mbTotN/mbTotn*100).toFixed(2):null},learned:new Date().toISOString().slice(0,10)};
+  E(`MB=${JSON.stringify(MBT)}`);
+  const mbRate=list=>{const u=list.filter(e=>e.mp!=null);if(!u.length)return null;let h=0;for(const e of u){const p=predOf(e);const t=MBT.g.length?mbPickT(MBT.g,p).i:mbPickN(p,sigmaM);if(t===homeIdx(e))h++;}return +(h/u.length*100).toFixed(1);};
+  console.log(`勝分差區間:採用 ${mbUse}(回測 實戰表 ${MBT.tot.emp}% / 常態 ${MBT.tot.norm}%),σ殘差 ${sigmaM}`);
+
   /* ---------- 4) 主力缺陣係數(由完整紀錄簿學習) ---------- */
   const inj=JSON.parse(JSON.stringify(W.learnInjFactor(LED)));
 
@@ -440,7 +489,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
 
   /* ---------- 6) 輸出 ---------- */
   const hist=(prev.hist||[]).filter(h=>h.d!==today);
-  if(hit!=null)hist.push({d:today,s:S,k:K,hit:+(hit*100).toFixed(1),n:samples.length});
+  if(hit!=null)hist.push({d:today,s:S,k:K,hit:+(hit*100).toFixed(1),mb:mbRate(win),n:samples.length});
   while(hist.length>HIST_MAX)hist.shift();
   const bySy={};LED.forEach(e=>{(bySy[e.sy]=bySy[e.sy]||[]).push(e);});
   const seasons=Object.keys(bySy).map(Number).sort((a,b)=>a-b).map(sy=>{
@@ -448,11 +497,12 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     return {s:sy,n:rg.length,nm:rg.length-rp.length,po:all.filter(e=>e.po).length,nu:all.filter(e=>e.nu).length,
       hit:rp.length?+(rp.filter(e=>e.hit).length/rp.length*100).toFixed(1):null,
       mae:rp.length?+(rp.reduce((a,e)=>a+Math.abs(e.am-e.m*K),0)/rp.length).toFixed(1):null,
+      mb:(sy===seasonNow&&rp.some(e=>e.mbh!=null))?+(rp.filter(e=>e.mbh).length/rp.filter(e=>e.mbh!=null).length*100).toFixed(1):mbRate(rp),   /* 本季用凍結的預測,歷史以現行表回算 */
       pl:all.filter(e=>e.pl&&e.pl.h&&e.pl.a).length};});
   const health={withBx:LED.filter(e=>e.bx).length,withPg:LED.filter(e=>e.pg).length,withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
     fixed,added,errors,fitN:samples.length,pdb:pdbN,seasonsN:seasons.length,seasons,secs:Math.round((Date.now()-t0)/1000)};
   const fit={variant,prm:PRMF,K:KF,coef:coefF,trainN:finalTrain.length,win:WIN,bt,tot,hcaBySeason,phEval};
-  const calib={k:K,sigma:S,injF:inj.f,inj,injPG,prm:PRMF,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
+  const calib={k:K,sigma:S,injF:inj.f,inj,injPG,prm:PRMF,mb:MBT,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
     last:LED.length?LED[LED.length-1].d:null,updated:new Date().toISOString(),window:FIT_DAYS,health};
   fs.writeFileSync(F_CALIB,JSON.stringify(calib));
   for(const sy of Object.keys(bySy)){
