@@ -1111,7 +1111,7 @@ function gameCard(g,p,rv){
     ${(isLive&&g.lastPlay)?`<div class="why" style="border-top:none;margin-top:6px;padding-top:0"><span class="k" style="color:var(--teal)">即時重點</span>${esc(g.lastPlay)}</div>`:''}
     ${bestLine?`<div class="why"${la?' style="border-top:none;margin-top:6px;padding-top:0"':''}><span class="k" style="color:var(--teal)">比賽重點</span>${esc(bestLine)}</div>`:''}
     <div class="why"><span class="k">預測理由</span>${esc(p.why)}</div>
-    ${rv?`<div class="review ${rv.hit?'good':'bad'}"><span class="k">${rv.hit?'賽後檢討 ✓':'賽後檢討 ✗'}</span>${esc(rv.text)}</div>`:''}
+    ${rv?`<div class="review ${rv.hit?'good':'bad'}"><span class="k">${rv.hit?'賽後檢討 ✓':'賽後檢討 ✗'}</span>${esc(rv.text)}${rv.mbText?`<br><span class="k" style="color:var(--amber)">分差區間</span>${esc(rv.mbText)}`:''}</div>`:''}
   </div>`;
 }
 
