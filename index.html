@@ -726,12 +726,23 @@ function effTable(date,season){
 
 /* 傷兵名單(ESPN 官方,僅套用於今天以後的比賽——回測不套用,因為無法得知歷史傷兵) */
 let INJ={},INJ_READY=false;const injPts={};
+/* ESPN 傷兵名單的 athlete 物件「沒有 id 欄位」,編號藏在 links/headshot 的網址裡;舊版讀 athlete.id 永遠是 0,
+   導致查不到場均得分、傷兵修正從未真正生效(靠自有資料庫每日快照才發現)。再找不到就用姓名比對球員資料庫 */
+function injAthleteId(a){
+  if(!a)return 0;
+  if(a.id&&+a.id)return +a.id;
+  for(const l of (a.links||[])){const m=/\/id\/(\d+)/.exec(l.href||'');if(m)return +m[1];}
+  const hm=/players\/full\/(\d+)\.png/.exec(a.headshot?.href||a.headshot||'');if(hm)return +hm[1];
+  const nm=(a.displayName||'').toLowerCase();
+  const hit=Object.values(PDB.players).find(p=>(p.n||'').toLowerCase()===nm);
+  return hit?+hit.id:0;
+}
 async function loadInjuries(teamIds){
   const d=await jget(`${SB}/injuries`);
   const map={};
   (d.injuries||[]).forEach(t=>{
     const tid=+(t.id||t.team?.id||0);
-    const list=(t.injuries||[]).map(x=>({id:+(x.athlete?.id||0),name:x.athlete?.displayName,
+    const list=(t.injuries||[]).map(x=>({id:injAthleteId(x.athlete),name:x.athlete?.displayName,
       status:x.status||x.type?.description||x.type?.name||''})).filter(x=>x.name);
     if(tid)map[tid]=list;
   });

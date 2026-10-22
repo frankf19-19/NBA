@@ -368,7 +368,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const DAILY=readJSON(F_DAILY,{inj:{},st:{},news:{}});
   const SBu=E('SB');
   try{const d=await W.jget(`${SBu}/injuries`);
-    DAILY.inj[today]=(d.injuries||[]).flatMap(t=>(t.injuries||[]).map(x=>({t:+(t.id||t.team?.id||0),p:+(x.athlete?.id||0),n:x.athlete?.displayName||'',
+    DAILY.inj[today]=(d.injuries||[]).flatMap(t=>(t.injuries||[]).map(x=>({t:+(t.id||t.team?.id||0),p:W.injAthleteId(x.athlete),n:x.athlete?.displayName||'',
       s:x.status||x.type?.description||'',d:(x.shortComment||x.longComment||x.details?.detail||'').slice(0,160),dt:(x.date||'').slice(0,10)})));
   }catch(e){console.error('傷兵快照失敗:',e.message);}
   try{const d=await W.jget('https://site.api.espn.com/apis/v2/sports/basketball/nba/standings?level=2');const o={};
