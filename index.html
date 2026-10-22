@@ -130,8 +130,8 @@
   .team.rhe .cell.r{font-size:18px}
   .team.rhe.win .cell.r{color:var(--amber)}
   .team.rhe .cell.he{font-size:13px;opacity:.85}
-  .pill.live{background:rgba(239,95,95,.14);color:#ff8a8a;border:1px solid rgba(239,95,95,.4)}
-  .pill.live .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff6b6b;
+  .pill.live{background:rgba(239,95,95,.14);color:var(--miss);border:1px solid rgba(239,95,95,.4)}
+  .pill.live .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--miss);
     margin-right:5px;animation:blink 1.2s ease-in-out infinite}
   @keyframes blink{50%{opacity:.25}}
   .live-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
@@ -263,6 +263,11 @@
   .wrap{position:relative;z-index:1}
   header,.game,.player,.analysis,.headline,.pd-head,.bio .b,.table-wrap,.zone-box,.pitch-item,.gd-score,.sr-item{transition:background 1s ease,border-color 1s ease}
   #themeBar{display:flex;align-items:center;gap:7px;margin-top:12px;position:relative;flex-wrap:wrap}
+  /* 手機:31 個主題鈕改成單列橫向滑動,不再佔掉半個畫面 */
+  @media (max-width:640px){
+    #themeBar{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+    #themeBar>*{flex:0 0 auto}
+  }
   .theme-b{font-size:16px;line-height:1;background:var(--wash);border:1px solid var(--line);
     border-radius:999px;width:34px;height:34px;cursor:pointer;transition:transform .12s,border-color .12s}
   .theme-b.tb-abbr{width:auto;min-width:40px;padding:0 8px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--ink2)}
@@ -332,7 +337,7 @@
           <button class="today-btn" id="calibRun" style="color:var(--teal);border-color:rgba(78,202,193,.5)">開始體檢</button>
           <span class="tag" id="calibProg"></span>
         </div>
-        <div id="calibOut" style="font-size:14px">✅ 校準是全自動的:每天第一次開站會背景回測近 14 天,自動修正 K(分差刻度)與 σ(信心刻度)並立即套用,結果記在下方履歷。這裡的「開始體檢」是看完整報告用的:信心分桶、分差段位、紀錄簿統計,以及手動微調。跑 14 天約需 10~20 秒。</div>
+        <div id="calibOut" style="font-size:14px">✅ 校準是全自動的:雲端每天以近 2,500 場例行賽重新擬合 K(分差刻度)與 σ(信心刻度),並由四萬場歷史資料學習各項參數,所有裝置共用同一份;雲端逾 36 小時未更新時才改由本機回測近 14 天。這裡的「開始體檢」是看完整報告用的:信心分桶、分差段位、紀錄簿統計,以及手動微調。跑 14 天約需 10~20 秒。</div>
         <div id="calibHist"></div>
       </div>
     </section>
@@ -386,7 +391,7 @@
     </section>
   </div>
 
-  <footer>模型:火力=整季場均得分65%+近10場35%;失分=整季70%+近10場30%;再依休息日(背靠背 −1.6 分、久休 −0.4 分、充足 +0.3 分)與連勝連敗氣勢(上限 ±0.6 分)修正,含主場 +2.6 分,另計入:官方傷兵名單(缺陣主力依場均得分折算,上限 −4.5 分)、本季對戰往績(±0.45 分)、4 天 3 戰疲勞(−0.8 分)、逐隊偏差回饋(從預測紀錄簿學習模型對各隊的系統性高低估,阻尼 35%、上限 ±1.5 分)。K 與 σ 每日自動校準。開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿。球員層:站內建立全聯盟球員資料庫(30 隊全名單與本季數據,每日更新),每場終場後記錄兩隊上場球員數據進紀錄簿;傷兵折算係數由「主力缺陣比賽的實際殘差」自動學習(滿 30 場啟用)。雲端校準:每天台灣時間約 14:10 由 GitHub Actions 在雲端直接執行本頁模型,回補全季紀錄簿、擬合 K/σ/缺陣係數並更新球員資料庫,所有裝置共用同一份(季後賽另行標記,不入校準與偏差)。雲端紀錄簿收錄 ESPN 可取得的全部賽季(1994-95 季起)比賽與每場球員數據,ESPN 缺比分的空殼場次自動排除;2020 泡泡園區中立場比賽另行標記,不入偏差與缺陣學習。戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.8 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v1.9 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -398,29 +403,34 @@ const PRM={hca:2.6,b2b:-1.6,r34:0.3,r5:-0.4,g4:-0.8,mo4:0.6,mo2:0.25,h2h:0.15,h2
   ph:[1,1,1,1,1],ss:null,src:'default'};
 /* 季內時間刻度:開季第 0–13 / 14–29 / 30–59 / 60–119 / 120+ 天,各段分差乘數(雲端由歷年資料學得;預設 1 = 不調整)
    實測:開季前兩週預測過於極端(0.76)、季末偏保守(1.11) */
+/* 各賽季開幕日:雲端由紀錄簿整理(ssMap,含 1998-99 縮水季 2 月開打、2020-21 季 12 月開打等),本季另以 ss 傳遞;都沒有才用 10/22 估 */
+function seasonStart(sy){
+  const m=PRM.ssMap&&PRM.ssMap[sy];if(m&&/^\d{4}-\d\d-\d\d$/.test(m))return m;
+  if(PRM.ss&&seasonOf(PRM.ss)===sy)return PRM.ss;
+  return `${sy-1}-10-22`;
+}
+function phaseIndex(date){const d=daysBetween(seasonStart(seasonOf(date)),date);return d<14?0:d<30?1:d<60?2:d<120?3:4;}
 function phaseMult(date){
   if(!date||!Array.isArray(PRM.ph))return 1;
-  const sy=seasonOf(date);
-  const st=(PRM.ss&&seasonOf(PRM.ss)===sy)?PRM.ss:`${sy-1}-10-22`;
-  const d=daysBetween(st,date);
-  const k=d<14?0:d<30?1:d<60?2:d<120?3:4;
-  const m=+PRM.ph[k];return isFinite(m)&&m>0?m:1;
+  const m=+PRM.ph[phaseIndex(date)];return isFinite(m)&&m>0?m:1;
 }
 /* 顯示用:參數換算成實際分數(內部參數 × 分差刻度 K) */
-const PTS=v=>{const x=v*MARGIN_K;return (x>0?'+':'')+r1(x);};
+const PTS=v=>{const x=v*MARGIN_K;return (x>0?'+':'')+x.toFixed(1);};
 const HOME_PT_BOOST=2.6;
 let RUN_SIGMA=parseFloat(localStorage.getItem('nba_sigma'))||11.5;
 let MARGIN_K=parseFloat(localStorage.getItem('nba_mk'))||1.0;
 const $=id=>document.getElementById(id);
-const esc=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r1=x=>Math.round(x*10)/10;
 async function jget(url){const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
 function erf(x){const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);
   const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y;}
 const normCdf=z=>0.5*(1+erf(z/Math.SQRT2));
 const log5=(pa,pb)=>{const d=pa+pb-2*pa*pb;return d===0?0.5:(pa-pa*pb)/d;};
-function etToday(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'})).toISOString().slice(0,10);}
 const ET_FMT=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+/* 美東「今天」:直接以美東時區格式化。舊寫法先轉成字串再 new Date(),會被當成瀏覽器本地時間解析,
+   在台灣 12:00–20:00(美東 0–8 點)會算成前一天——今天按鈕、傷兵套用、即時更新全都跟著錯一天 */
+function etToday(){return ET_FMT.format(new Date());}
 function etDateOf(iso){if(!iso)return '';if(iso.length<=10)return iso;const t=Date.parse(iso.length===17&&iso.endsWith('Z')?iso.replace('Z',':00Z'):iso);return isFinite(t)?ET_FMT.format(new Date(t)):iso.slice(0,10);}
 function shiftDate(ds,n){const d=new Date(ds+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 function taipeiTime(iso){try{return new Date(iso).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){return null;}}
@@ -430,7 +440,8 @@ const teamLogo=ab=>{if(!ab)return '';const sl=(LOGO_SLUG[ab]||ab).toLowerCase();
   return sl==='nba'?'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png'
     :`https://a.espncdn.com/i/teamlogos/nba/500/${sl}.png`;};
 const logoImg=(ab,cls)=>ab?`<img class="${cls||'tlg'}" src="${teamLogo(ab)}" alt="" loading="lazy" onerror="this.remove()">`:'';
-const seasonOf=d=>{const y=+d.slice(0,4),m=+d.slice(5,7);return m>=8?y+1:y;};
+/* 賽季年份:8 月起算新季;2020 泡泡園區(7/30–10/11)仍屬 2019-20 季 */
+const seasonOf=d=>{if(d>='2020-07-30'&&d<'2020-10-12')return 2020;const y=+d.slice(0,4),m=+d.slice(5,7);return m>=8?y+1:y;};
 const daysBetween=(a,b)=>Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/86400000);
 const parsePct=rec=>{const m=/^(\d+)-(\d+)/.exec(rec||'');if(!m)return null;const w=+m[1],l=+m[2];return (w+l)?w/(w+l):null;};
 function parseClock(c){const m=/(\d+):(\d+)/.exec(c||'');if(m)return +m[1]*60+ +m[2];const f=parseFloat(c);return isFinite(f)?f:0;}
@@ -533,7 +544,7 @@ async function statsWithPrior(id,season,asOf,date,rows){
   const vg=15-(cur.gp||0);
   const pPF=prev.rs/prev.gp,pPA=prev.ra/prev.gp;
   const out=Object.assign({streak:null,rest:null,l10:null,rPFg:NaN,rPAg:NaN,g4:0},cur.gp?cur:{});
-  out.curGp=cur.gp||0;
+  out.curGp=cur.gp||0;out.curW=cur.w||0;out.curL=cur.l||0;  /* 真實戰績另存,顯示用(打底後的 w/l 是小數) */
   out.gp=out.curGp+vg;
   out.rs=(cur.rs||0)+pPF*vg;out.ra=(cur.ra||0)+pPA*vg;
   out.w=(cur.w||0)+prev.pct*vg;out.l=out.gp-out.w;
@@ -551,7 +562,8 @@ const PDB_KEY='nba_pdb_v1';
 let PDB={ts:0,season:null,players:{},teams:{}};
 function loadPDB(){try{const x=JSON.parse(localStorage.getItem(PDB_KEY));if(x&&x.players)PDB=x;}catch(e){}}
 function savePDB(){try{localStorage.setItem(PDB_KEY,JSON.stringify(PDB));}catch(e){}}
-function pdbStale(){return !PDB.ts||(Date.now()-PDB.ts)>30*3600*1000||PDB.season!==seasonOf(etToday());}
+/* 雲端每天更新一次,但 GitHub 排程常延後數小時,門檻放到 40 小時以免瀏覽器自己重抓 500 多名球員 */
+function pdbStale(){return !PDB.ts||(Date.now()-PDB.ts)>40*3600*1000||PDB.season!==seasonOf(etToday());}
 function pdbStat(id){const p=PDB.players[id];if(!p)return null;
   return {gamesPlayed:p.gp,avgMinutes:p.min,avgPoints:p.pts,avgRebounds:p.reb,avgAssists:p.ast,avgSteals:p.stl,
     avgBlocks:p.blk,avgTurnovers:p.to,fieldGoalPct:p.fg,threePointFieldGoalPct:p.p3,freeThrowPct:p.ft};}
@@ -703,11 +715,13 @@ async function loadInjuries(teamIds){
       status:x.status||x.type?.description||x.type?.name||''})).filter(x=>x.name);
     if(tid)map[tid]=list;
   });
+  /* 整份名單都看(舊版只看前 6 人,主力排在後面就漏掉);場均先查球員資料庫,查不到的才另外抓,每隊最多補抓 8 人 */
   const jobs=[];
-  (teamIds||[]).forEach(tid=>{(map[tid]||[]).slice(0,6).forEach(x=>{
+  (teamIds||[]).forEach(tid=>{let extra=0;(map[tid]||[]).forEach(x=>{
     if(!/out|day|question|doubt/i.test(x.status))return;
     if(injPts[x.id]==null&&PDB.players[x.id]&&PDB.players[x.id].pts!=null)injPts[x.id]=PDB.players[x.id].pts;
     if(injPts[x.id]!=null){x.pts=injPts[x.id];return;}
+    if(extra++>=8){x.pts=0;return;}
     jobs.push(jget(`${CORE}/athletes/${x.id}/overview`)
       .then(o=>{const m=ovStats(o);x.pts=injPts[x.id]=(m&&m.avgPoints)||0;})
       .catch(()=>{x.pts=injPts[x.id]=0;}));
@@ -837,8 +851,14 @@ function predict(g,pm,lg,date){
   }
 
   const marginPre=expHome-expAway;
-  const mid=(expHome+expAway)/2,half=marginPre/2*MARGIN_K*phaseMult(date);
+  const phm=phaseMult(date);
+  const mid=(expHome+expAway)/2,half=marginPre/2*MARGIN_K*phm;
   expHome=mid+half;expAway=mid-half;
+  let phTxt='';
+  if(Math.abs(phm-1)>=0.02){
+    const pk=phaseIndex(date),pn=['開季前兩週','開季第 3–4 週','開季第 5–8 週','季中','季末'][pk];
+    phTxt=`季內階段:${pn},歷年資料顯示此時預測分差應${phm<1?'收斂':'放大'}(乘數 ${phm.toFixed(2)})。`;factors.push('季內階段');
+  }
 
   // 逐隊偏差修正(從紀錄簿學習,套在 K 之後)
   /* 雲端回測顯示無助益時(PRM.tb=false)不套用 */
@@ -864,7 +884,7 @@ function predict(g,pm,lg,date){
   if(hOff.usedRec||hDef.usedRec)recBits.push(`主隊近10場 得${r1(H.rPFg)} 失${r1(H.rPAg)}`);
   if(aOff.usedRec||aDef.usedRec)recBits.push(`客隊近10場 得${r1(A.rPFg)} 失${r1(A.rPAg)}`);
   if(recBits.length){why+=`近況已納入:${recBits.join('、')}。`;factors.unshift('近10場走勢');}
-  why+=priorTxt+(useEff?effTxt:'')+restTxt+moTxt+h2hTxt+injTxt+biasTxt;
+  why+=priorTxt+(useEff?effTxt:'')+restTxt+moTxt+h2hTxt+injTxt+phTxt+biasTxt;
   why+=`含主場 ${PTS(PRM.hca)} 分${PRM.src==='cloud'?'(由歷年資料學得)':''},修正後得分期望 ${expAway.toFixed(1)}:${expHome.toFixed(1)}(客:主),預期 ${fav} 贏約 ${r1(Math.abs(margin))} 分。`;
   if(Math.abs(margin)<2)why+=`分差不到 2 分,實質接近五五波。`;
   return {home_prob:hp,away_prob:1-hp,predicted_winner:fav,home_score_pred:hs,away_score_pred:as,
@@ -1029,8 +1049,10 @@ let refreshTimer=null;
 function buildDailySummary(date,games,preds,reviews,acc){
   const parts=[];
   const done=reviews.filter(Boolean);
+  const pre=done.filter(r=>r.g&&r.g.stype===1).length,fin=done.length-pre;  /* 熱身賽不列入命中統計 */
   if(done.length){
-    parts.push(`這一天已完賽 ${done.length} 場,模型命中 ${acc.hits} 場(${(acc.hits/done.length*100).toFixed(0)}%),平均分差誤差 ${acc.errN?r1(acc.errSum/acc.errN)+' 分':'—'}。`);
+    if(fin)parts.push(`這一天已完賽 ${fin} 場,模型命中 ${acc.hits} 場(${(acc.hits/fin*100).toFixed(0)}%),平均分差誤差 ${acc.errN?r1(acc.errSum/acc.errN)+' 分':'—'}${pre?`;另有 ${pre} 場熱身賽不列入統計`:''}。`);
+    else parts.push(`這一天完賽的 ${pre} 場都是熱身賽,照常預測與檢討,但不列入命中統計、校準與紀錄簿。`);
     const upsets=done.filter(r=>!r.hit&&r.favProb>=63).sort((a,b)=>b.favProb-a.favProb);
     if(upsets.length){
       const u=upsets[0];
@@ -1093,8 +1115,9 @@ async function loadDay(quiet){
     const reviews=[];curGames=games;curPreds=[];
     games.forEach(g=>{
       const A=pm[g.awayId],H=pm[g.homeId];
-      if(A&&A.gp&&!g.awayRec)g.awayRec=`${A.w}-${A.l}`;
-      if(H&&H.gp&&!g.homeRec)g.homeRec=`${H.w}-${H.l}`;
+      const recOf=t=>t.prior?`${t.curW}-${t.curL}`:`${t.w}-${t.l}`;
+      if(A&&A.gp&&!g.awayRec)g.awayRec=recOf(A);
+      if(H&&H.gp&&!g.homeRec)g.homeRec=recOf(H);
       g._eff=EFF_DAY;
       const p=predict(g,pm,lg,date);curPreds.push(p);
       const isSpecial=/postpon|suspend|cancel/i.test((g.detail||'')+(g.typeName||''));
@@ -1628,14 +1651,41 @@ async function loadCloud(){
     const r=await fetch('calib.json?t='+Date.now(),{cache:'no-store'});
     if(r.ok){const c=await r.json();
       if(c&&isFinite(c.k)&&isFinite(c.sigma)){CLOUD=c;
-        if(cloudFresh()){MARGIN_K=+c.k;RUN_SIGMA=+c.sigma;if(isFinite(c.injF))INJ_F=+c.injF;
-          if(c.prm&&isFinite(c.prm.hca)){Object.assign(PRM,c.prm);PRM.src='cloud';}}}}
+        /* 由四萬場學得的參數不會一天就過期:就算雲端檔逾時也照用(總比退回寫死的舊預設好);
+           K/σ 先套雲端值,逾時才由本機近 14 天回測再微調 */
+        MARGIN_K=+c.k;RUN_SIGMA=+c.sigma;if(isFinite(c.injF))INJ_F=+c.injF;
+        if(c.prm&&isFinite(c.prm.hca)){Object.assign(PRM,c.prm);PRM.src='cloud';}
+        if(cloudFresh()){localStorage.setItem('nba_mk',String(MARGIN_K));localStorage.setItem('nba_sigma',String(RUN_SIGMA));}}}
   }catch(e){}
+  renderFooter();
   try{
     const r=await fetch('pdb.json?t='+Date.now(),{cache:'no-store'});
     if(r.ok){const d=await r.json();
       if(d&&d.players&&(d.ts||0)>(PDB.ts||0)&&Object.keys(d.players).length>=200){PDB=d;savePDB();}}
   }catch(e){}
+}
+/* 頁尾模型說明:依「目前實際生效」的參數即時產生,不再寫死數字(參數每天由雲端學習,寫死一定會過期) */
+function renderFooter(){
+  const el=$('foot');if(!el)return;
+  const learned=PRM.src==='cloud';
+  const upd=CLOUD&&CLOUD.updated?new Date(CLOUD.updated).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):null;
+  const hh=(CLOUD&&CLOUD.health)||{};
+  const on=[];
+  if(PRM.b2b)on.push(`背靠背 ${PTS(PRM.b2b)} 分`);if(PRM.r34)on.push(`休 2–3 天 ${PTS(PRM.r34)} 分`);if(PRM.r5)on.push(`久休 ${PTS(PRM.r5)} 分`);
+  if(PRM.g4)on.push(`4 天 3 戰 ${PTS(PRM.g4)} 分`);if(PRM.mo4||PRM.mo2)on.push(`連勝連敗氣勢(上限 ±${r1(Math.abs(PRM.mo4||PRM.mo2)*MARGIN_K)} 分)`);
+  if(PRM.h2h)on.push(`本季對戰往績(±${r1(PRM.h2hCap*MARGIN_K)} 分)`);
+  const ph=Array.isArray(PRM.ph)&&PRM.ph.some(x=>Math.abs(x-1)>=0.02)?`季內階段乘數(開季兩週 ${(+PRM.ph[0]).toFixed(2)} → 季末 ${(+PRM.ph[4]).toFixed(2)},依歷年資料學得)`:null;
+  const parts=[
+    `模型:火力=整季場均得分 65%+近 10 場 35%;失分=整季 70%+近 10 場 30%;主場 ${PTS(PRM.hca)} 分${learned?'(由歷年資料迴歸學得,統計上不顯著的項目自動歸零)':'(預設)'}`,
+    on.length?`另計:${on.join('、')}`:`休息日、連勝氣勢、對戰往績等項目經四萬場資料檢驗後,統計上不顯著,已自動歸零`,
+    `官方傷兵名單(缺陣主力依場均得分 × 係數 ${INJ_F} 折算,係數由紀錄簿自學,上限 −4.5 分)`,
+    ph,
+    PRM.tb===false?'逐隊偏差回饋經回測無助益,目前停用':'逐隊偏差回饋(阻尼 35%、上限 ±1.5 分)',
+    `K=${MARGIN_K.toFixed(2)}、σ=${RUN_SIGMA.toFixed(2)} 由近 2,500 場例行賽每日重新擬合`,
+    `開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿`
+  ].filter(Boolean);
+  const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v1.9 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -1656,7 +1706,7 @@ function renderCalibHist(){
   if(L.length){
     const hits=L.filter(x=>x.hit).length;
     const mae=L.reduce((s,x)=>s+Math.abs(x.am-x.m*MARGIN_K),0)/L.length;
-    html+=`<div class="pos-group" style="margin-top:14px">預測紀錄簿(此裝置累計)</div>
+    html+=`<div class="pos-group" style="margin-top:14px">預測紀錄簿(${cloudFresh()?'雲端最近 '+L.length+' 場,含季後賽':'此裝置累計'})</div>
       <div style="font-size:13.5px">已記錄 <b>${L.length}</b> 場:命中率 <b>${(hits/L.length*100).toFixed(1)}%</b>、分差平均誤差 <b>${mae.toFixed(2)} 分</b>、目前參數 K=${MARGIN_K.toFixed(2)}、σ=${RUN_SIGMA.toFixed(2)}</div>`;
   }
   const by={};
@@ -1672,7 +1722,7 @@ function renderCalibHist(){
       <tr><th>近期最被低估</th><th>樣本</th><th>平均偏差</th></tr>${top.map(fmt).join('')}
       ${bot.length?`<tr><th>近期最被高估</th><th></th><th></th></tr>${bot.map(fmt).join('')}`:''}
       </table></div>
-      <div class="tag" style="margin-top:6px">偏差已透過「逐隊偏差回饋」小幅計入新預測(阻尼 35%、上限 ±1.5 分),且只使用比賽日之前的紀錄。</div>`;
+      <div class="tag" style="margin-top:6px">${PRM.tb===false?'雲端以最近三季模擬「逐隊偏差回饋」開與關,開了反而沒有降低誤差,目前停用——這張表只供觀察,不影響預測。':'偏差已透過「逐隊偏差回饋」小幅計入新預測(阻尼 35%、上限 ±1.5 分),且只使用比賽日之前的紀錄。'}</div>`;
   }
   if(CLOUD){
     const hh=CLOUD.health||{};
@@ -1728,7 +1778,7 @@ function renderCalibHist(){
   if(h.length){
     html+=`<div class="pos-group" style="margin-top:14px">校準履歷</div>
       <div class="table-wrap"><table class="stat" style="min-width:400px">
-      <tr><th>日期</th><th>σ</th><th>K</th><th>近14天命中</th><th>樣本</th></tr>
+      <tr><th>日期</th><th>σ</th><th>K</th><th>樣本命中率</th><th>樣本(場)</th></tr>
       ${h.map(r=>`<tr><td>${esc(r.d)}</td><td>${r.s.toFixed(2)}</td><td>${r.k!=null?r.k.toFixed(2):'-'}</td><td>${r.hit}%</td><td>${r.n}</td></tr>`).join('')}
       </table></div>`;
   }
@@ -1914,13 +1964,13 @@ $('calibRun').addEventListener('click',async()=>{
       MARGIN_K=nk;localStorage.setItem('nba_mk',String(nk));
       RUN_SIGMA=best;localStorage.setItem('nba_sigma',String(best));
       pushCalibHist({d:etToday(),s:+best.toFixed(2),k:+nk.toFixed(2),hit:+(hitRate*100).toFixed(1),n:samples.length});
-      ap.textContent='已套用 ✓';ap.disabled=true;renderCalibHist();loadDay();
+      ap.textContent='已套用 ✓';ap.disabled=true;renderCalibHist();loadDay();renderFooter();
     });
     const rs=$('calibReset');
     if(rs)rs.addEventListener('click',()=>{
       RUN_SIGMA=11.5;localStorage.removeItem('nba_sigma');
       MARGIN_K=1.0;localStorage.removeItem('nba_mk');
-      rs.textContent='已還原 ✓';rs.disabled=true;loadDay();
+      rs.textContent='已還原 ✓';rs.disabled=true;loadDay();renderFooter();
     });
     renderCalibHist();
   }catch(e){
@@ -2141,7 +2191,7 @@ if(!window.__CLOUD_BUILD){
   loadCloud().then(()=>loadDay()).then(()=>{
     if(cloudFresh()){$('status').textContent+=` · ☁️ 雲端校準 K=${MARGIN_K.toFixed(2)} σ=${RUN_SIGMA.toFixed(2)}`;return;}
     return autoCalibrate();
-  }).then(()=>maybeBuildPDB());
+  }).then(()=>{renderFooter();return maybeBuildPDB();});
 }
 </script>
 </body>

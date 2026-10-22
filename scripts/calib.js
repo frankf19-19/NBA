@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -43,7 +43,7 @@ async function netFetch(url){
   if(NET)return NET(url);
   for(let i=0;i<4;i++){
     try{
-      const r=await fetch(url,{headers:{'User-Agent':'nba-scoreboard-calib/1.5'},signal:AbortSignal.timeout(20000)});
+      const r=await fetch(url,{headers:{'User-Agent':'nba-scoreboard-calib/1.9'},signal:AbortSignal.timeout(20000)});
       if(r.status===404)return r;
       if(!r.ok)throw new Error('HTTP '+r.status);
       return r;
@@ -108,6 +108,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const W=dom.window,E=x=>W.eval(x);
   if(typeof W.samplesForDate!=='function'||typeof W.predict!=='function')throw new Error('index.html 缺少 samplesForDate/predict,無法校準');
   if(isFinite(prev.k)&&isFinite(prev.sigma))E(`MARGIN_K=${+prev.k};RUN_SIGMA=${+prev.sigma};`);
+  /* 掃描新場次前先套上目前生效的學習參數:紀錄簿凍結的 m 才會等於網站當天真正顯示的預測
+     (舊版掃描時仍是寫死的預設參數,m 與網站不一致;mp 另以最新參數重算,不受影響) */
+  if(prev.prm&&isFinite(prev.prm.hca))E(`Object.assign(PRM,${JSON.stringify(prev.prm)});PRM.src='cloud';`);
   /* 紀錄簿不放 localStorage(上限 500 萬字元,數萬場會爆):
      預測某日時,把「該日之前最近 3,000 場」直接交給網頁的 ledger(),逐隊偏差只需每隊最近 12 場,且不偷看未來 */
   let CUR=[];
@@ -281,6 +284,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   }
   PRMF.ph=phAdopt?learnPh(US.filter(e=>e.sy>=seasonNow-8&&e.sy<seasonNow)):[1,1,1,1,1];
   PRMF.ss=firstD[seasonNow]||null;
+  PRMF.ssMap=firstD;   /* 各賽季實際開幕日,網頁回看歷史日期時季內階段才對得上(1998-99 二月開打、2020-21 十二月開打) */
   US.forEach(e=>{delete e.mp0;});
   console.log(`季內時間刻度:${phAdopt?'採用':'不採用'}`,JSON.stringify(PRMF.ph),JSON.stringify(phEval));
   // 歷年主場優勢(每季只用基礎實力 + 常數迴歸)
