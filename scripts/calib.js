@@ -611,6 +611,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at};}}
     fs.writeFileSync(F_PRE,JSON.stringify(PRE));
   }catch(e){console.error('賽前預測失敗:',e.message);}
+  fs.writeFileSync(F_DAILY,JSON.stringify(DAILY));   /* 賽前段落的執行記錄也要存 */
   console.log(`每日快照:傷兵 ${(DAILY.inj[today]||[]).length} 筆、戰績 ${Object.keys(DAILY.st[today]||{}).length} 隊、新聞 ${(DAILY.news[today]||[]).length} 則;賽前預測記錄 ${preN} 場`);
 
   /* ---------- 5.55) 教練(各季各隊總教練,ESPN core API;本季每天更新,歷史賽季一次補齊)、對戰索引、球隊風格 ---------- */
