@@ -56,7 +56,7 @@ async function netFetch(url){
 const readJSON=(f,d)=>{try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch(e){return d;}};
 function etToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function shiftDate(d,n){const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
-const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;}if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
+const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;}if(e.mm!=null)o.mm=e.mm;if(e.mk!=null)o.mk=e.mk;if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
 /* 依日期插入(保持紀錄簿時間順序,逐隊偏差才不會看錯場次) */
 function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+hi)>>1;if(arr[mid].d<=e.d)lo=mid+1;else hi=mid;}arr.splice(lo,0,e);}
 
@@ -194,8 +194,12 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         const fresh=[...r.samples].filter(x=>x.st!==1&&(x.sy||sy)===sy&&!have.has(String(x.id))&&!haveKey.has(x.d+'|'+x.hid+'|'+x.aid)).map(x=>{
           const e={id:String(x.id),d:x.d,sy:x.sy||sy,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,st:x.st,po:x.po?1:0,
             m:+(+x.m).toFixed(2),am:x.actM,hit:x.nm?null:(((x.m>=0)===x.homeWon)?1:0)};
-          if(x.mb!=null){e.mb=x.mb;e.mbp=x.mbp;e.mbh=(W.mbActualIdx(x.actM)===x.mb)?1:0;}   /* 勝分差區間預測與是否全中,凍結 */
-          if(x.mk!=null)e.mk=x.mk;if(x.mm!=null)e.mm=x.mm;   /* 當時用的盤口線、混合後最終分差(分),凍結 */
+          /* 最終預測(含盤口混合、含傷兵)與勝分差區間:優先用「開打前真的記下」的賽前預測;沒有(例如當天才新增的比賽)才用現在重算的 */
+          const pg0=PRE[String(x.id)];const useP=pg0&&pg0.mm!=null&&!x.nm;
+          const mm=useP?+pg0.mm:(x.mm!=null?+x.mm:null),mbI=useP?pg0.mb:x.mb,mbP=useP?pg0.mbp:x.mbp,mk=useP?pg0.mk:x.mk;
+          if(mbI!=null){e.mb=mbI;e.mbp=mbP;e.mbh=(W.mbActualIdx(x.actM)===mbI)?1:0;}   /* 勝分差區間預測與是否全中,凍結 */
+          if(mk!=null)e.mk=mk;if(mm!=null){e.mm=mm;e.hf=((mm>=0)===x.homeWon)?1:0;}   /* 當時盤口線、最終分差(分)、最終預測是否命中,凍結 */
+          if(useP)e.pgu=1;
           if(x.nm)e.nm=1;
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
@@ -424,7 +428,11 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       const w=learnW(tr);tM+=mae(te,r=>r.p)*te.length;tK+=mae(te,r=>r.k)*te.length;tB+=mae(te,r=>w*r.p+(1-w)*r.k)*te.length;tn+=te.length;}
     const ev=tn?{model:+(tM/tn).toFixed(3),mkt:+(tK/tn).toFixed(3),blend:+(tB/tn).toFixed(3),nTest:tn}:null;
     const use=!!(ev&&tn>=400&&ev.blend<ev.model-0.05);
-    PRMF.mk={use,w:use?learnW(rows):1,n:rows.length,eval:ev};
+    const wF=use?learnW(rows):1;
+    /* 信心刻度比例:混合後殘差標準差 / 模型殘差標準差(同一批有盤口的比賽),網頁用它收緊 σ */
+    const sd=f=>Math.sqrt(rows.reduce((a,r)=>a+(r.y-f(r))**2,0)/Math.max(1,rows.length));
+    const sigRatio=use&&rows.length>=300?+Math.max(0.7,Math.min(1,sd(r=>wF*r.p+(1-wF)*r.k)/sd(r=>r.p))).toFixed(3):1;
+    PRMF.mk={use,w:wF,n:rows.length,eval:ev,sigRatio};
     console.log('市場盤口對照:',JSON.stringify(PRMF.mk));
   }
   /* ---------- 3.7) 裁判因子:每位裁判過往「主隊實際 − 模型預期」收縮平均(÷(n+30)),逐季滾動驗證(只用該季之前的資料),
@@ -543,6 +551,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     const all=bySy[sy],rg=all.filter(e=>!e.po&&!e.nu),rp=rg.filter(e=>!e.nm);
     return {s:sy,n:rg.length,nm:rg.length-rp.length,po:all.filter(e=>e.po).length,nu:all.filter(e=>e.nu).length,
       hit:rp.length?+(rp.filter(e=>e.hit).length/rp.length*100).toFixed(1):null,
+      hitF:rp.some(e=>e.hf!=null)?+(rp.filter(e=>e.hf).length/rp.filter(e=>e.hf!=null).length*100).toFixed(1):null,   /* 最終預測(含盤口、傷兵)命中率 */
       mae:rp.length?+(rp.reduce((a,e)=>a+Math.abs(e.am-e.m*K),0)/rp.length).toFixed(1):null,
       mb:(sy===seasonNow&&rp.some(e=>e.mbh!=null))?+(rp.filter(e=>e.mbh).length/rp.filter(e=>e.mbh!=null).length*100).toFixed(1):mbRate(rp),   /* 本季用凍結的預測,歷史以現行表回算 */
       pl:all.filter(e=>e.pl&&e.pl.h&&e.pl.a).length};});
