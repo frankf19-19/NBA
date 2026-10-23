@@ -549,6 +549,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         DAILY.injpdf[today]={key,pv:2,url:L0.u,n:rows.length,rows,raw:text.slice(0,60000)};
         dlog(`官方傷兵報告:${key},解析 ${rows.length} 列,原文 ${text.length} 字`);}else dlog('官方傷兵報告:最新版已存過 '+key);}else dlog('官方傷兵報告:沒有抓到可用的 PDF');
   }catch(e){dlog('官方傷兵報告失敗:'+e.message);}
+  if(!INJOFF.length){const lastK=Object.keys(DAILY.injpdf||{}).sort().pop();if(lastK)INJOFF=DAILY.injpdf[lastK].rows||[];}   /* 本次沒有新版就用最近存的一份 */
   /* 球員異動(簽約、交易、釋出) */
   try{const d=await W.jget(`${SBu}/transactions?limit=100`);DAILY.tx=DAILY.tx||{};
     const seen=new Set(Object.values(DAILY.tx).flat().map(x=>x.d+'|'+x.t+'|'+x.s));const add=[];
@@ -585,7 +586,8 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       const pm={};await Promise.all(ids.map(async(id,i)=>{pm[id]=await W.statsWithPrior(id,season,asOf,d,seas[i]);}));
       const lg=W.leagueRPG(pm);const EF=W.effTable(d,season);
       W.__inj=await W.loadInjuries(ids);E('INJ=window.__inj;INJ_READY=true');
-      if(INJOFF.length&&d===today){W.__injOff=INJOFF;const nOff=E('applyOfficialInjuries(window.__injOff)');dlog(`官方傷兵報告套用 ${nOff} 筆(含 Doubtful/Questionable/Probable 分級)`);}
+      {const md=`${d.slice(5,7)}/${d.slice(8,10)}/${d.slice(0,4)}`;const rowsD=INJOFF.filter(r=>r.d===md);
+        if(rowsD.length){W.__injOff=rowsD;const nOff=E('applyOfficialInjuries(window.__injOff)');dlog(`官方傷兵報告套用 ${d}:${nOff}/${rowsD.length} 筆(含 Doubtful/Questionable/Probable 分級)`);}}
       setCur(d);
       for(const g of live){
         let hw=0,aw=0;(seas[ids.indexOf(g.homeId)]||[]).forEach(r=>{if(r.done&&r.oppId===g.awayId&&r.pf!=null&&r.date<d){if(r.won)hw++;else aw++;}});
