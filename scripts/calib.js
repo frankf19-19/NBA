@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -119,7 +119,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   /* 掃描新場次前先套上目前生效的學習參數:紀錄簿凍結的 m 才會等於網站當天真正顯示的預測
      (舊版掃描時仍是寫死的預設參數,m 與網站不一致;mp 另以最新參數重算,不受影響) */
   if(prev.prm&&isFinite(prev.prm.hca))E(`Object.assign(PRM,${JSON.stringify(prev.prm)});PRM.src='cloud';`);
-  if(prev.mb&&Array.isArray(prev.mb.g))E(`MB=${JSON.stringify(prev.mb)}`);   /* 勝分差區間機率表(昨日學得),新場次的區間預測據此凍結 */
+  if(prev.mb&&Array.isArray(prev.mb.g))E(`MB=${JSON.stringify(prev.mb)}`);
+  {const mkp={};for(const [id,x] of Object.entries(PRE)){if(x.mk!=null||(x.of&&x.of.length))mkp[id]={mk:x.mk??null,of:x.of||null};}
+    E(`MK_PRE=${JSON.stringify(mkp)}`);}   /* 賽前記錄的盤口與裁判,掃描入帳時沿用(不用賽後資料) */   /* 勝分差區間機率表(昨日學得),新場次的區間預測據此凍結 */
   /* 紀錄簿不放 localStorage(上限 500 萬字元,數萬場會爆):
      預測某日時,把「該日之前最近 3,000 場」直接交給網頁的 ledger(),逐隊偏差只需每隊最近 12 場,且不偷看未來 */
   let CUR=[];
@@ -193,11 +195,12 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           const e={id:String(x.id),d:x.d,sy:x.sy||sy,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,st:x.st,po:x.po?1:0,
             m:+(+x.m).toFixed(2),am:x.actM,hit:x.nm?null:(((x.m>=0)===x.homeWon)?1:0)};
           if(x.mb!=null){e.mb=x.mb;e.mbp=x.mbp;e.mbh=(W.mbActualIdx(x.actM)===x.mb)?1:0;}   /* 勝分差區間預測與是否全中,凍結 */
+          if(x.mk!=null)e.mk=x.mk;if(x.mm!=null)e.mm=x.mm;   /* 當時用的盤口線、混合後最終分差(分),凍結 */
           if(x.nm)e.nm=1;
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           if(x.hs!=null){e.hs=x.hs;e.as=x.as;}
-          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at};   /* 賽前(含當日傷兵)預測,凍結 */
+          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at};   /* 賽前(含當日傷兵)預測,凍結 */
           return e;});
         if(fresh.length){fresh.forEach(e=>{have.add(e.id);haveKey.add(e.d+'|'+e.hid+'|'+e.aid);insertSorted(LED,e);byId.set(e.id,e);});added+=fresh.length;sAdd+=fresh.length;}
         return true;
@@ -407,6 +410,41 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const mbRate=list=>{const u=list.filter(e=>e.mp!=null);if(!u.length)return null;let h=0;for(const e of u){const p=predOf(e);const t=MBT.g.length?mbPickT(MBT.g,p).i:mbPickN(p,sigmaM);if(t===homeIdx(e))h++;}return +(h/u.length*100).toFixed(1);};
   console.log(`勝分差區間:採用 ${mbUse}(回測 實戰表 ${MBT.tot.emp}% / 常態 ${MBT.tot.norm}%),σ殘差 ${sigmaM}`);
 
+  /* ---------- 3.6) 市場盤口對照:最終分差 = w×模型 + (1−w)×市場收盤讓分線;w 由歷史學,依時間順序滾動驗證(先 400 場起,每 150 場一段),
+       測試段誤差比純模型低才啟用。ESPN 只保留約一年的盤口,樣本會逐日累積 ---------- */
+  {
+    const rows=reg.filter(e=>e.mp!=null&&e.od&&(e.od.spH?.[1]!=null||e.od.sp!=null)).sort((a,b)=>a.d.localeCompare(b.d))
+      .map(e=>({p:predOf(e),k:-(e.od.spH?.[1]??e.od.sp),y:e.am}));
+    const mae=(rs,f)=>rs.reduce((a,r)=>a+Math.abs(r.y-f(r)),0)/Math.max(1,rs.length);
+    /* 取誤差最低的 w;若有多個 w 誤差相差在 0.03 分內(雜訊範圍),取其中模型權重最大的——盡量保留自己的模型 */
+    const learnW=rs=>{const ms=[];for(let w=0;w<=1.0001;w+=0.05)ms.push([+w.toFixed(2),mae(rs,r=>w*r.p+(1-w)*r.k)]);const bm=Math.min(...ms.map(x=>x[1]));
+      return ms.filter(x=>x[1]<=bm+0.03).reduce((a,x)=>x[0]>a?x[0]:a,0);};
+    let tM=0,tK=0,tB=0,tn=0;
+    for(let i=400;i<rows.length;i+=150){const tr=rows.slice(0,i),te=rows.slice(i,i+150);if(te.length<50)break;
+      const w=learnW(tr);tM+=mae(te,r=>r.p)*te.length;tK+=mae(te,r=>r.k)*te.length;tB+=mae(te,r=>w*r.p+(1-w)*r.k)*te.length;tn+=te.length;}
+    const ev=tn?{model:+(tM/tn).toFixed(3),mkt:+(tK/tn).toFixed(3),blend:+(tB/tn).toFixed(3),nTest:tn}:null;
+    const use=!!(ev&&tn>=400&&ev.blend<ev.model-0.05);
+    PRMF.mk={use,w:use?learnW(rows):1,n:rows.length,eval:ev};
+    console.log('市場盤口對照:',JSON.stringify(PRMF.mk));
+  }
+  /* ---------- 3.7) 裁判因子:每位裁判過往「主隊實際 − 模型預期」收縮平均(÷(n+30)),逐季滾動驗證(只用該季之前的資料),
+       有降低誤差才啟用。裁判一季只吹 40–65 場,預期多半是雜訊,所以門檻放嚴 ---------- */
+  {
+    const rows=reg.filter(e=>e.mp!=null&&Array.isArray(e.of)&&e.of.length).map(e=>({sy:e.sy,d:e.d,of:e.of,p:predOf(e),y:e.am}));
+    const build=rs=>{const t={};for(const r of rs){const res=r.y-r.p;for(const n of r.of){const x=t[n]=t[n]||[0,0];x[0]+=res;x[1]++;}}
+      const o={};for(const [n,x] of Object.entries(t))o[n]=+(x[0]/(x[1]+30)).toFixed(2);return o;};
+    const adj=(tab,of)=>{const v=of.map(n=>tab[n]).filter(x=>isFinite(x));return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;};
+    const sys=[...new Set(rows.map(r=>r.sy))].sort((a,b)=>a-b);
+    let t0=0,t1=0,tn=0;
+    for(const S of sys.slice(1)){const tr=rows.filter(r=>r.sy<S),te=rows.filter(r=>r.sy===S);if(tr.length<500||te.length<200)continue;
+      const tab=build(tr);for(const r of te){t0+=Math.abs(r.y-r.p);t1+=Math.abs(r.y-(r.p+adj(tab,r.of)));tn++;}}
+    const ev=tn?{model:+(t0/tn).toFixed(3),withRef:+(t1/tn).toFixed(3),nTest:tn}:null;
+    const use=!!(ev&&tn>=800&&ev.withRef<ev.model-0.02);
+    PRMF.ref={use,n:rows.length,refs:Object.keys(build(rows)).length,eval:ev};if(use)PRMF.ref.tab=build(rows);
+    console.log('裁判因子:',JSON.stringify({...PRMF.ref,tab:undefined}));
+  }
+  E(`Object.assign(PRM,${JSON.stringify({mk:PRMF.mk,ref:PRMF.ref})})`);
+
   /* ---------- 4) 主力缺陣係數(由完整紀錄簿學習) ---------- */
   const inj=JSON.parse(JSON.stringify(W.learnInjFactor(LED)));
 
@@ -462,15 +500,17 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       for(const g of live){
         let hw=0,aw=0;(seas[ids.indexOf(g.homeId)]||[]).forEach(r=>{if(r.done&&r.oppId===g.awayId&&r.pf!=null&&r.date<d){if(r.won)hw++;else aw++;}});
         g._h2h={hw,aw};g._eff=EF;
+        const info=await W.fetchGameInfo(g.id);if(info.mk!=null){g._mk=info.mk;g._mkPv=info.mkPv;}if(info.of&&info.of.length)g._of=info.of;
         const p=W.predict(g,pm,lg,d);if(p.raw_margin_pre==null)continue;
         const ih=W.injInfo(g.homeId),ia=W.injInfo(g.awayId);
-        PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
-          hn:ih.names,an:ia.names,p:+p.home_prob.toFixed(3),k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString()};preN++;
+        PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),mm:+p.raw_margin.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
+          hn:ih.names,an:ia.names,p:+p.home_prob.toFixed(3),mb:p.mb,mbp:+(+p.mbp).toFixed(3),mk:info.mk??null,ou:info.ou??null,of:info.of||[],
+          k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString()};preN++;
       }
       E('INJ_READY=false');
     }
     /* 已入紀錄簿但當時沒附賽前預測的,補附 */
-    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at};}}
+    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at};}}
     fs.writeFileSync(F_PRE,JSON.stringify(PRE));
   }catch(e){console.error('賽前預測失敗:',e.message);}
   console.log(`每日快照:傷兵 ${(DAILY.inj[today]||[]).length} 筆、戰績 ${Object.keys(DAILY.st[today]||{}).length} 隊、新聞 ${(DAILY.news[today]||[]).length} 則;賽前預測記錄 ${preN} 場`);
