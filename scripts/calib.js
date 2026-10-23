@@ -175,7 +175,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       const wp=g('gameProjection'),pd=g('teamPredPtDiff');if(wp==null)return {x:1};
       return {hp:+((side[0]==='h'?wp:100-wp)/100).toFixed(3),pd:pd==null?null:+((side[0]==='h'?pd:-pd)).toFixed(2),lm:p.lastModified||null};
     }catch(e){return null;}};
-  {const need=e=>e.sy>=seasonNow0-PBP_BACK_SEASONS&&!e.bpi&&!e.bpx&&!e.po;
+  {const need=e=>e.sy>=seasonNow0-PBP_BACK_SEASONS&&!e.bpi&&!e.bpx&&!e.po&&!(PRE[e.id]&&PRE[e.id].bpi!=null);
     const bk=LED.filter(need).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,BX_PER_RUN);let n=0;
     for(let i=0;i<bk.length;i+=PL_BATCH){await Promise.all(bk.slice(i,i+PL_BATCH).map(async e=>{const r=await fetchBPI(e.id);if(!r)return;if(r.x)e.bpx=1;else{e.bpi=r;n++;}}));}
     if(bk.length)console.log(`ESPN BPI 回補:${n}/${bk.length} 場(剩 ${LED.filter(need).length-bk.length} 場)`);}
@@ -219,6 +219,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           if(mbI!=null){e.mb=mbI;e.mbp=mbP;e.mbh=(W.mbActualIdx(x.actM)===mbI)?1:0;}   /* 勝分差區間預測與是否全中,凍結 */
           if(mk!=null)e.mk=mk;if(mm!=null){e.mm=mm;e.hf=((mm>=0)===x.homeWon)?1:0;}   /* 當時盤口線、最終分差(分)、最終預測是否命中,凍結 */
           if(useP)e.pgu=1;
+          if(pg0&&pg0.bpi!=null)e.bpi={hp:pg0.bpiP??null,pd:+pg0.bpi,lm:pg0.at,pre:1};   /* 開打前記到的 BPI,優先於賽後回補的版本 */
           if(x.nm)e.nm=1;
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
@@ -437,7 +438,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
        (先 400 場起、每 150 場一段),測試段誤差比純模型低才啟用;權重取誤差最低者,相差 0.03 分內取模型權重最大者。
        BPI 只採用 lastModified 早於開球時間的版本(避免賽後更新的偷看) ---------- */
   {
-    const bpiOK=e=>e.bpi&&e.bpi.pd!=null&&(!e.bpi.lm||!e.tip||Date.parse(e.bpi.lm)<=Date.parse(e.tip)+600000);
+    const bpiOK=e=>e.bpi&&e.bpi.pd!=null&&(e.bpi.pre||!e.bpi.lm||!e.tip||Date.parse(e.bpi.lm)<=Date.parse(e.tip)+600000);
     const mkOf=e=>(e.od&&(e.od.spH?.[1]!=null||e.od.sp!=null))?-(e.od.spH?.[1]??e.od.sp):null;
     const base=reg.filter(e=>e.mp!=null).sort((a,b)=>a.d.localeCompare(b.d));
     const mae=(rs,f)=>rs.reduce((a,r)=>a+Math.abs(r.y-f(r)),0)/Math.max(1,rs.length);
@@ -496,7 +497,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
 
   /* ---------- 5.5) 自有資料庫:每日快照(傷兵名單、戰績榜、新聞)、球員資料庫週快照、賽前預測 ---------- */
   const F_DAILY=path.join(D_SEED,`daily-${seasonNow}.json`);
-  const DAILY=readJSON(F_DAILY,{inj:{},st:{},news:{}});
+  const DAILY=readJSON(F_DAILY,{inj:{},st:{},news:{}});DAILY.log=DAILY.log||{};DAILY.log[today]=[];const dlog=m=>{DAILY.log[today].push(m);console.log(m);};
   const SBu=E('SB');
   try{const d=await W.jget(`${SBu}/injuries`);
     DAILY.inj[today]=(d.injuries||[]).flatMap(t=>(t.injuries||[]).map(x=>({t:+(t.id||t.team?.id||0),p:W.injAthleteId(x.athlete),n:x.athlete?.displayName||'',
@@ -519,11 +520,11 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         if(cells.length>=4&&/@/.test(cells[0]))REFTODAY.push({g:cells[0],crew:cells.slice(1,4).map(x=>x.replace(/\s*\(#\d+\)/,'').trim()).filter(Boolean),alt:(cells[4]||'').replace(/\s*\(#\d+\)/,'').trim()||null});}}
     DAILY.refs=DAILY.refs||{};DAILY.refs[today]={posted:dm?dm[1].trim():null,games:REFTODAY};
     console.log(`官方裁判派遣:${REFTODAY.length} 場`);
-  }catch(e){console.error('裁判派遣失敗:',e.message);}
+  }catch(e){dlog('裁判派遣失敗:'+e.message);}
   /* NBA 官方傷兵報告 PDF(每天多版):取最新一份,存原文與解析後的列(球隊/球員/狀態/原因) */
   try{const idx=await (await fetch(`https://official.nba.com/nba-injury-report-${seasonNow-1}-${String(seasonNow).slice(2)}-season/`,{headers:{'User-Agent':'Mozilla/5.0 (nba-scoreboard)'},signal:AbortSignal.timeout(20000)})).text();
     const links=[...idx.matchAll(/href="([^"]*Injury-Report_(\d{4}-\d\d-\d\d)_(\d\d)([AP]M)\.pdf)"/gi)].map(m=>({u:m[1],d:m[2],h:(+m[3]%12)+(m[4].toUpperCase()==='PM'?12:0)})).sort((a,b)=>(b.d+String(b.h).padStart(2,'0')).localeCompare(a.d+String(a.h).padStart(2,'0')));
-    DAILY.injpdf=DAILY.injpdf||{};
+    DAILY.injpdf=DAILY.injpdf||{};dlog(`官方傷兵報告索引:頁面 ${idx.length} 字,Injury-Report 連結 ${links.length} 個${links[0]?'(最新 '+links[0].u.split('/').pop()+')':''}`);
     if(links.length){const L0=links[0];const key=`${L0.d}_${L0.h}`;
       if(!Object.values(DAILY.injpdf).some(x=>x.key===key)){
         const buf=Buffer.from(await (await fetch(L0.u,{signal:AbortSignal.timeout(30000)})).arrayBuffer());
@@ -536,8 +537,8 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
             const pm=/([A-Z][A-Za-z.'-]+, [A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.]+)?)\s*$/.exec(left);
             rows.push({g:game,t:left.replace(pm?pm[1]:'','').trim().slice(0,40),p:pm?pm[1]:left.slice(-40),s:m[2],r:m[3].slice(0,80)});}}
         DAILY.injpdf[today]={key,url:L0.u,n:rows.length,rows,raw:text.slice(0,60000)};
-        console.log(`官方傷兵報告:${L0.d} ${L0.h}:00,解析 ${rows.length} 列,原文 ${text.length} 字`);}}
-  }catch(e){console.error('官方傷兵報告失敗:',e.message);}
+        dlog(`官方傷兵報告:${L0.d} ${L0.h}:00,解析 ${rows.length} 列,原文 ${text.length} 字`);}else dlog('官方傷兵報告:最新版已存過 '+key);}
+  }catch(e){dlog('官方傷兵報告失敗:'+e.message);}
   /* 球員異動(簽約、交易、釋出) */
   try{const d=await W.jget(`${SBu}/transactions?limit=100`);DAILY.tx=DAILY.tx||{};
     const seen=new Set(Object.values(DAILY.tx).flat().map(x=>x.d+'|'+x.t+'|'+x.s));const add=[];
