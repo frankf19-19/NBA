@@ -1,35 +1,22 @@
-❌ 403   730ms      445B  NBA cdn 今日賽程
-      (HTML/text) <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> Y
-❌ 403    47ms      431B  NBA cdn 全季賽程
-      (HTML/text) <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> Y
-❌ 403    77ms      443B  NBA cdn 單場 boxscore(2025-26 例)
-      (HTML/text) <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> Y
-❌ 403    50ms      447B  NBA cdn 單場 playbyplay
-      (HTML/text) <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> Y
-❌ ERR NBA stats.nba.com(預期被擋): The operation was aborted due to timeout
-✅ 200   346ms    38638B  NBA 官方裁判派遣
-      (HTML/text) <!DOCTYPE html> <html lang="en-US" prefix="og: http://ogp.me/ns# fb: http://ogp.
-✅ 200   212ms    47436B  NBA 官方傷兵報告 PDF 目錄
-      (HTML/text) <!DOCTYPE html> <html lang="en-US" prefix="og: http://ogp.me/ns# fb: http://ogp.
-✅ 200   158ms     6859B  ESPN core 單場賠率(多家)
-      count,pageIndex,pageSize,pageCount,items
-✅ 200    24ms     1715B  ESPN core 單場 predictor(BPI)
-      $ref,name,shortName,lastModified,homeTeam,awayTeam
-✅ 200    30ms    29744B  ESPN core 球隊季統計
-      $ref,season,team,splits,seasonType
-✅ 200   124ms    28507B  ESPN core 球員季統計
-      $ref,season,athlete,splits,seasonType
-✅ 200   247ms    12080B  ESPN 球員 splits
-      filters,displayName,labels,names,displayNames,descriptions,splitCategories
-✅ 200    24ms   470032B  ESPN 球員 gamelog
-      filters,labels,names,displayNames,events,seasonTypes,glossary
-✅ 200   159ms   192959B  ESPN 交易/異動
-      timestamp,status,season,requestedYear,count,pageIndex,pageSize,pageCount,transactions
-❌ 404    18ms       52B  ESPN powerindex(BPI 排名)
-      error
-✅ 200    92ms       64B  ESPN 單場 odds 歷史(line movement)
-      count,pageIndex,pageSize,pageCount,items
-✅ 200   471ms   270148B  Basketball-Reference(ToS 限制,只測可達)
-      (HTML/text)  <!DOCTYPE html> <html data-version="klecko-" data-root="/home/bbr/build" lang="
-❌ 401   238ms       12B  balldontlie API
-      (HTML/text) Unauthorized
+PREDICTOR {"name":"Boston Celtics at Detroit Pistons","shortName":"BOS @ DET","lastModified":"2026-10-23T02:54Z","homeTeam":{"team":{}},"awayTeam":{"team":{},"statistics":[{"name":"gameProjection","displayName":"WIN PROB","shortDisplayName":"GP","description":"Team's predicted win percentage in this game at time of given BPI run","abbreviation":"GP","value":47.897,"displayValue":"47.9"},{"name":"matchupQuality","displayName":"Matchup Quality","shortDisplayName":"MQ","description":"A measure of projected competitiveness and excitement in the game, using a 0 to 100 scale, with 100 as the most exciting","abbreviation":"MQ","value":90.977,"displayValue":"90.977"},{"name":"teamChanceLoss","displayName":"Team Chance Loss","shortDisplayName":"Chance Loss","description":"","abbreviation":"TCL","value":52.103,"displayValue":"52.1"},{"name":"teamPredPtDiff","displayName":"Team Pred Pt Diff","shortDisplayName":"Pred Pt Diff","description":"","abbreviation":"TPPD","value":-0.674,"displayValue":"-0.674"},{"name":"teamExpectedPts","displayName":"Team Expected Pts","shortDisplayName":"Expected Pts","description":"","abbreviation":"TEP","value":110.721,"displayValue":"110.721"},{"name":"oppExpectedPts","displayName":"Opp Expected Pts","shortDisplayName":"Opp Expected Pts","description":"","abbreviation":"OEP","value":111.395,"displayValue":"111.395"}]}}
+ODDS count 1
+ODDS item {"provider":{"id":"100","name":"DraftKings","priority":1},"details":"BOS -1.5","overUnder":220.5,"spread":1.5,"overOdds":-115,"underOdds":-105,"awayTeamOdds":{"favorite":true,"underdog":false,"moneyLine":-125,"spreadOdds":-112,"open":{"favorite":false,"pointSpread":{"alternateDisplayValue":"+2.5","american":"+2.5"},"spread":{"value":1.86,"displayValue":"20/23","alternateDisplayValue":"-115","decimal":1.86,"fraction":"20/23","american":"-115"},"moneyLine":{"value":2.05,"displayValue":"21/20","alternateDisplayValue":"+105","decimal":2.05,"fraction":"21/20","american":"+105"}},"close":{"pointSpread":{"alternateDisplayValue":"-1.5","american":"-1.5"},"spread":{"value":1.89,"displayValue":"25/28","alternateDisplayValue":"-112","decimal":1.89,"fraction":"25/28","american":"-112"},"moneyLine":{"value":1.8,"displayValue":"4/5","alternateDisplayValue":"-125","decimal":1.8,"fraction":"4/5","americ
+REF TEXT e|Replay Center|Replay Archive|Replay Triggers|NBA.com|Search for:|SEARCH|Date |Date|NBA Referee Assignments|October 22, 2026|Referee assignments are posted at approximately 9:00am ET each game day. |Game|Crew Chief|Referee|Umpire|Alternate|Cleveland @ Philadelphia|Curtis Blair (#74) |Aaron Smith (#51) |CJ Washington (#12) |Denver @ Oklahoma City|Zach Zarba (#15) |Sean Corbin (#33) |Robert Hussey (#85) |Replay Center:|Justin Van Duyne|WNBA Referee Assignments|October 22, 2026|Referee assignments are posted at approximately 9:00am ET each game day. |Game|Crew Chief|Referee|Umpire|Alternate|Crew Chief Position|Proficient in Referee and Umpire positions|Leader of the crew, on and off the floor|High-level play calling, partnering skills, and tools for handling any game situation, including interpersonal communication|Understands the importance of extending into their secondary area of coverage, with accuracy|Referee Position|Proficient in all Umpire position requirements|Effectively the glue for a crew through consistency, teamwork, and communication - makes partners better by carrying a larger portion of the crew’s load than an Umpire|Capable of handling some plays in secondary area of coverage|Ability to recognize and appropriately manage shifts in game conditions (intensity, emotions, decorum, style of play etc.)|Umpire Position|Aggressively and accurately calls plays in the primary area of responsibility|Responsible for basic mechanics including rotations, positioning and clock and team foul awareness|Strong rules knowledge coupled with contributions to in-game discussions/issues regarding adjudication|Today&#8217;s Officials|2026-27 NBA Officiating Staff|2026-27 NBA Offi
+REF TABLE <table cellspacing="0" cellpadding="0" class="table"> <thead> <tr> <th class="tableTitle">Game</th> <th class="tableTitle">Crew Chief</th> <th class="tableTitle">Referee</th> <th class="tableTitle">Umpire</th> <th class="tableTitle">Alternate</th> </tr> </thead> <tbody> <tr> <td>Cleveland @ Philadelphia</td> <td> <a href="https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/Curtis-Blair.pdf" target="_blank"> Curtis Blair (#74) </a> </td> <td> <a href="https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/Aaron-Smith.pdf" target="_blank"> Aaron Smith (#51) </a> </td> <td> <a href="https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/Cj-Washington.pdf" target="_blank"> CJ Washington (#12) </a> </td> <td></td> </tr> <tr> <td>Denver @ Oklahoma City</td> <td> <a href="https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/Zach-Zarba.pdf" target="_blank"> Zach Zarba (#15) </a> </td> <td> <a href="https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/Sean-Corbin.pdf" target="_blank"> Sean Corbin (#33) </a> </td> <td> <a href="https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/Robert-Hussey.pdf" target="_blank"> Robert Hussey (#85) </a> </td> <td></td> </tr> </tbody> </table>
+INJ PDF links 106 [
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-Official-NBA-Playing-Rules.pdf',
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-NBA-Officials-Guide-10-14-26.pdf',
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-NBA-Officiating-Staff.pdf',
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-NBA-Officials-Headshots.pdf',
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-NBA-Concussion-Policy-Summary.pdf'
+]
+INJ PDF links 2026-27 106 [
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-Official-NBA-Playing-Rules.pdf',
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-NBA-Officials-Guide-10-14-26.pdf',
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-NBA-Officiating-Staff.pdf',
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-NBA-Officials-Headshots.pdf',
+  'https://ak-static.cms.nba.com/wp-content/uploads/sites/4/2026/10/2026-27-NBA-Concussion-Policy-Summary.pdf'
+]
+TEAM STATS defensive:blocks,defensiveRebounds,steals,turnoverPoints,defReboundRate,avgDefensiveRebounds,avgBlocks,avgSteals,avg48DefensiveRebounds,avg48Blocks,avg48Steals || general:disqualifications,flagrantFouls,fouls,reboundRate,ejections,technicalFouls,rebounds,minutes,avgMinutes,fantasyRating,NBARating,plusMinus,gameDayOfYear,avgRebounds,avgFouls,avgFlagrantFouls,avgTechnicalFouls,avgEjections,avgDisqualifications,assistTurnoverRatio,stealFoulRatio,blockFoulRatio,avgTeamRebounds,totalRebounds,totalTechnicalFouls,teamAssistTurnoverRatio,teamRebounds,stealTurnoverRatio,avg48Rebounds,avg48Fouls,avg48FlagrantFouls,avg48TechnicalFouls,avg48Ejections,avg48Disqualifications,gamesPlayed,gamesStarted,doubleDouble,tripleDouble || offensive:assists,effectiveFGPct,fieldGoals,fieldGoalsAttempted,fieldGoalsMade,fieldGoalPct,freeThrows,freeThrowPct,freeThrowsAttempted,freeThrowsMade,offensiveRebounds,points,turnovers,threePointPct,threePointFieldGoalsAttempted,threePointFieldGoalsMade,trueShootingPct,teamTurnovers,totalTurnovers,assistRatio,pointsInPaint,offReboundRate,turnoverRatio,fastBreakPoints,possessions,paceFactor,avgFieldGoalsMade,avgFieldGoalsAttempted,avgThreePointFieldGoalsMade,avgThreePointFieldGoalsAttempted,avgFreeThrowsMade,avgFreeThrowsAttempted,avgPoints,avgOffensiveRebounds,avgAssists,avgTurnovers,offensiveReboundPct,estimatedPossessions,avgEstimatedPossessions,pointsPerEstimatedPossessions
+TX [{"date":"2026-10-19T07:00Z","description":"Signed G Brandon Miller to a multiyear contract extension.","team":{"id":"30","location":"Charlotte","name":"Hornets","abbreviation":"CHA","displayName":"Charlotte Hornets","color":"008ca8","alternateColor":"1d1060"}},{"date":"2026-10-19T07:00Z","description":"Waived G Walter Clayton Jr. and G Micah Peavy.","team":{"id":"29","location":"Memphis","name":"Grizzlies","abbreviation":"MEM","displayName":"Memphis Grizzlies","color":"5d76a9","alternateColor":"12173f"}},{"date":"2026-10-19T07:00Z","description":"Re-signed G Cason Wallace to a rookie-scale contract extension.","team":{"id":"25","location":"Oklahoma City","name":"Thunder","abbreviation":"OKC
+PREDICTOR 2024 {"name":"Houston Rockets at Philadelphia 76ers","shortName":"HOU @ PHI","lastModified":"2024-06-28T05:09Z","homeTeam":{"team":{}},"awayTeam":{"team":{},"statistics":[{"name":"gameProjection","displayName":"WIN PROB","shortDisplayName":"GP","description":"Team's predicted win percentage in this game at time of given BPI run","abbreviation":"GP","value":26.229000000000003,"displayValue":"26.2"},{"na
