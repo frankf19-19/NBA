@@ -523,11 +523,14 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   }catch(e){dlog('裁判派遣失敗:'+e.message);}
   /* NBA 官方傷兵報告 PDF(每天多版):取最新一份,存原文與解析後的列(球隊/球員/狀態/原因) */
   try{const idx=await (await fetch(`https://official.nba.com/nba-injury-report-${seasonNow-1}-${String(seasonNow).slice(2)}-season/`,{headers:{'User-Agent':'Mozilla/5.0 (nba-scoreboard)'},signal:AbortSignal.timeout(20000)})).text();
-    const links=[...idx.matchAll(/href="([^"]*Injury-Report_(\d{4}-\d\d-\d\d)_(\d\d)([AP]M)\.pdf)"/gi)].map(m=>({u:m[1],d:m[2],h:(+m[3]%12)+(m[4].toUpperCase()==='PM'?12:0)})).sort((a,b)=>(b.d+String(b.h).padStart(2,'0')).localeCompare(a.d+String(a.h).padStart(2,'0')));
-    DAILY.injpdf=DAILY.injpdf||{};dlog(`官方傷兵報告索引:頁面 ${idx.length} 字,Injury-Report 連結 ${links.length} 個${links[0]?'(最新 '+links[0].u.split('/').pop()+')':''}`);
-    if(links.length){const L0=links[0];const key=`${L0.d}_${L0.h}`;
+    /* 連結格式 Injury-Report_YYYY-MM-DD_HH_MM(AM|PM).pdf,每 15 分鐘一版;頁面會列出整天的時段,實際存在的才抓得到,由最新往前試 */
+    const links=[...new Set([...idx.matchAll(/href="([^"]*Injury-Report_(\d{4}-\d\d-\d\d)_(\d\d)_(\d\d)([AP]M)\.pdf)"/gi)].map(m=>JSON.stringify({u:m[1],d:m[2],h:(+m[3]%12)+(m[5].toUpperCase()==='PM'?12:0),mi:+m[4]})))].map(x=>JSON.parse(x))
+      .sort((a,b)=>(b.d+String(b.h).padStart(2,'0')+String(b.mi).padStart(2,'0')).localeCompare(a.d+String(a.h).padStart(2,'0')+String(a.mi).padStart(2,'0')));
+    DAILY.injpdf=DAILY.injpdf||{};dlog(`官方傷兵報告索引:Injury-Report 連結 ${links.length} 個${links[0]?'(最新 '+links[0].u.split('/').pop()+')':''}`);
+    let L0=null,buf=null;
+    for(const L of links.slice(0,12)){try{const r=await fetch(L.u,{signal:AbortSignal.timeout(30000)});if(r.ok){const b=Buffer.from(await r.arrayBuffer());if(b.length>2000&&b.slice(0,4).toString()==='%PDF'){L0=L;buf=b;break;}}}catch(e){}}
+    if(L0){const key=`${L0.d}_${String(L0.h).padStart(2,'0')}${String(L0.mi).padStart(2,'0')}`;
       if(!Object.values(DAILY.injpdf).some(x=>x.key===key)){
-        const buf=Buffer.from(await (await fetch(L0.u,{signal:AbortSignal.timeout(30000)})).arrayBuffer());
         let text='';try{const pdfParse=require('pdf-parse');text=(await pdfParse(buf)).text||'';}catch(e){console.error('pdf-parse 不可用:',e.message);}
         const rows=[];let game='',team='';
         for(const raw of text.split(/\n/)){const ln=raw.replace(/\s+/g,' ').trim();if(!ln)continue;
@@ -537,7 +540,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
             const pm=/([A-Z][A-Za-z.'-]+, [A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.]+)?)\s*$/.exec(left);
             rows.push({g:game,t:left.replace(pm?pm[1]:'','').trim().slice(0,40),p:pm?pm[1]:left.slice(-40),s:m[2],r:m[3].slice(0,80)});}}
         DAILY.injpdf[today]={key,url:L0.u,n:rows.length,rows,raw:text.slice(0,60000)};
-        dlog(`官方傷兵報告:${L0.d} ${L0.h}:00,解析 ${rows.length} 列,原文 ${text.length} 字`);}else dlog('官方傷兵報告:最新版已存過 '+key);}
+        dlog(`官方傷兵報告:${key},解析 ${rows.length} 列,原文 ${text.length} 字`);}else dlog('官方傷兵報告:最新版已存過 '+key);}else dlog('官方傷兵報告:沒有抓到可用的 PDF');
   }catch(e){dlog('官方傷兵報告失敗:'+e.message);}
   /* 球員異動(簽約、交易、釋出) */
   try{const d=await W.jget(`${SBu}/transactions?limit=100`);DAILY.tx=DAILY.tx||{};
