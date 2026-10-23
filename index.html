@@ -447,7 +447,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.8 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.9 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -2005,7 +2005,7 @@ function renderFooter(){
     `官方傷兵名單(缺陣主力依場均得分 × 係數 ${INJ_F} 折算,係數由紀錄簿自學,上限 −4.5 分)`,
     ph,
     PRM.tb===false?'逐隊偏差回饋經回測無助益,目前停用':'逐隊偏差回饋(阻尼 35%、上限 ±1.5 分)',
-    (PRM.mk&&PRM.mk.use)?`市場盤口對照:最終分差 = 模型 ${Math.round(PRM.mk.w*100)}% + DraftKings 收盤讓分線 ${Math.round((1-PRM.mk.w)*100)}%(滾動驗證有效才啟用)`:'市場盤口對照:滾動驗證中,未啟用',
+    (PRM.mk&&PRM.mk.use)?`市場盤口對照:最終分差 = 模型 ${Math.round(PRM.mk.w*100)}% + DraftKings 收盤讓分線 ${Math.round((1-PRM.mk.w)*100)}%`:'預測只用自己的模型;市場盤口與 ESPN BPI 只記錄、只對照,不混入預測',
     (PRM.ref&&PRM.ref.use)?'裁判因子:已啟用(逐季驗證有效)':'裁判因子:逐季驗證中,未啟用',
     `K=${MARGIN_K.toFixed(2)}、σ=${RUN_SIGMA.toFixed(2)} 由近 2,500 場例行賽每日重新擬合`,
     `開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿`,
@@ -2013,7 +2013,7 @@ function renderFooter(){
     `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.8 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.9 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -2108,7 +2108,9 @@ function renderCalibHist(){
       <div class="tag" style="margin-top:4px">主力缺陣自學:樣本 ${lf.n} 場${lf.n?`,缺陣時平均殘差 ${lf.r>=0?'+':''}${lf.r.toFixed(1)} 分`:''} → 傷兵折算係數 ${lf.f}${lf.learned?'(已由紀錄簿學得)':'(預設,滿 30 場後自動學習)'}</div>`;
     const mkE=PRM.mk||{},rfE=PRM.ref||{},m3=PRM.mk3||{},mbE=PRM.mkb||{};
     const evs=(o,names)=>o.eval?`測試 ${o.eval.nTest} 場,分差誤差 模型 ${o.eval.model}${names.map((n,i)=>` / ${n} ${o.eval['src'+(i+1)]??'-'}`).join('')} / 混合 ${o.eval.blend}`:'樣本累積中';
-    html+=`<div class="tag" style="margin-top:4px">📈 市場盤口對照(模型 vs DraftKings 收盤讓分線,依時間順序滾動驗證):${evs(mkE,['市場'])} → ${mkE.use?`已啟用,模型權重 ${Math.round(mkE.w*100)}%`:'未啟用'}(累計 ${mkE.n??0} 場有盤口)</div>
+    const C=CLOUD&&CLOUD.cmp;const cs=x=>x?`${x.lab}:勝方 ${x.hit}%、分差誤差 ${x.mae}、全中 ${x.full}%(${x.n} 場)`:'';
+    if(C&&C.ours)html+=`<div class="pos-group" style="margin-top:14px">本季對照(開打前凍結的預測,只比較不混合)</div><div class="tag">${[C.ours,C.mkt,C.bpi].filter(Boolean).map(cs).join(' ｜ ')}</div>`;
+    html+=`<div class="tag" style="margin-top:4px">📈 市場盤口對照(模型 vs DraftKings 收盤讓分線,依時間順序滾動驗證):${evs(mkE,['市場'])} → <b>依設定不參與預測,只作對照</b>(累計 ${mkE.n??0} 場有盤口)</div>
       <div class="tag" style="margin-top:4px">🧮 ESPN BPI 對照:${evs(mbE,['BPI'])} → ${mbE.use?`已啟用,模型權重 ${Math.round(mbE.w*100)}%`:'未啟用'}(累計 ${PRM.bpiN??0} 場有 BPI);三來源(模型/市場/BPI):${evs(m3,['市場','BPI'])} → ${m3.use?`已啟用,權重 ${Math.round(m3.w*100)}% / ${Math.round(m3.wm*100)}% / ${Math.round(m3.wb*100)}%`:'未啟用'}</div>
       <div class="tag" style="margin-top:4px">🦓 裁判因子(每位裁判過往主隊相對模型的收縮偏差,逐季驗證):${rfE.eval?`測試 ${rfE.eval.nTest} 場,誤差 不用 ${rfE.eval.model} / 用 ${rfE.eval.withRef}`:'樣本累積中'} → ${rfE.use?'已啟用':'未啟用(未見改善或樣本不足)'}(${rfE.refs??0} 位裁判、${rfE.n??0} 場)</div>`;
     const hh2=(CLOUD&&CLOUD.health)||{},ipg=CLOUD&&CLOUD.injPG;

@@ -452,7 +452,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         const ws=learn(tr,k);tM+=mae(te,r=>r.x[0])*te.length;tB+=mae(te,r=>ws.reduce((a,w,j)=>a+w*r.x[j],0))*te.length;tn+=te.length;
         for(let j=1;j<k;j++)by[j]=(by[j]||0)+mae(te,r=>r.x[j])*te.length;}
       if(!tn)return null;const ev={model:+(tM/tn).toFixed(3),blend:+(tB/tn).toFixed(3),nTest:tn};for(let j=1;j<k;j++)ev['src'+j]=+(by[j]/tn).toFixed(3);return ev;};
-    const fit=(rows,k,label)=>{const ev=evalRows(rows,k);const use=!!(ev&&ev.nTest>=400&&ev.blend<ev.model-0.05);
+    /* 使用者決定:預測只用自己的模型,市場盤口與 BPI 只記錄、只對照,不混進預測(EXT_BLEND=1 才會啟用混合) */
+    const EXT_BLEND=process.env.EXT_BLEND==='1';
+    const fit=(rows,k,label)=>{const ev=evalRows(rows,k);const use=EXT_BLEND&&!!(ev&&ev.nTest>=400&&ev.blend<ev.model-0.05);
       const ws=use?learn(rows,k):[1,...new Array(k-1).fill(0)];
       const sigRatio=use&&rows.length>=300?+Math.max(0.7,Math.min(1,sd(rows,r=>ws.reduce((a,w,j)=>a+w*r.x[j],0))/sd(rows,r=>r.x[0]))).toFixed(3):1;
       const o={use,ws,n:rows.length,eval:ev,sigRatio};console.log(label,JSON.stringify(o));return o;};
@@ -678,6 +680,15 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     }else console.log(`賽前傷兵係數學習:樣本 ${rows.length} 場,滿 150 場後啟用`);
   }
 
+  /* ---------- 5.7) 本季對照:我們(開打前凍結的最終預測)vs 市場收盤線 vs ESPN BPI,只比較不混合 ---------- */
+  let CMP=null;
+  {const rows=LED.filter(e=>e.sy===seasonNow&&!e.po&&!e.nm&&e.mm!=null);
+    const stat=(f,lab)=>{const r=rows.filter(e=>f(e)!=null);if(!r.length)return null;const n=r.length;
+      return {lab,n,hit:+(r.filter(e=>(f(e)>=0)===(e.am>0)).length/n*100).toFixed(1),mae:+(r.reduce((a,e)=>a+Math.abs(e.am-f(e)),0)/n).toFixed(2),
+        full:+(r.filter(e=>{const t=MBT.g.length?mbPickT(MBT.g,f(e)).i:mbPickN(f(e),sigmaM);return t===homeIdx(e);}).length/n*100).toFixed(1)};};
+    CMP={n:rows.length,ours:stat(e=>e.mm,'我們'),mkt:stat(e=>e.mk!=null?e.mk:null,'市場收盤線'),bpi:stat(e=>(e.bpi&&e.bpi.pre&&e.bpi.pd!=null)?e.bpi.pd:null,'ESPN BPI')};
+    console.log('本季對照:',JSON.stringify(CMP));}
+
   /* ---------- 6) 輸出 ---------- */
   const hist=(prev.hist||[]).filter(h=>h.d!==today);
   if(hit!=null)hist.push({d:today,s:S,k:K,hit:+(hit*100).toFixed(1),mb:mbRate(win),n:samples.length});
@@ -694,7 +705,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const health={withPb:LED.filter(e=>e.pb).length,withOf:LED.filter(e=>e.of).length,withOd:LED.filter(e=>e.od).length,withBx:LED.filter(e=>e.bx).length,withPg:LED.filter(e=>e.pg).length,withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
     fixed,added,errors,fitN:samples.length,pdb:pdbN,seasonsN:seasons.length,seasons,secs:Math.round((Date.now()-t0)/1000)};
   const fit={variant,prm:PRMF,K:KF,coef:coefF,trainN:finalTrain.length,win:WIN,bt,tot,hcaBySeason,phEval};
-  const calib={k:K,sigma:S,injF:inj.f,inj,injPG,prm:PRMF,mb:MBT,styles:STY,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
+  const calib={k:K,sigma:S,injF:inj.f,inj,injPG,prm:PRMF,mb:MBT,styles:STY,cmp:CMP,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
     last:LED.length?LED[LED.length-1].d:null,updated:new Date().toISOString(),window:FIT_DAYS,health};
   fs.writeFileSync(F_CALIB,JSON.stringify(calib));
   for(const sy of Object.keys(bySy)){
