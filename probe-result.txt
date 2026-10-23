@@ -1,0 +1,35 @@
+❌ 403   730ms      445B  NBA cdn 今日賽程
+      (HTML/text) <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> Y
+❌ 403    47ms      431B  NBA cdn 全季賽程
+      (HTML/text) <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> Y
+❌ 403    77ms      443B  NBA cdn 單場 boxscore(2025-26 例)
+      (HTML/text) <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> Y
+❌ 403    50ms      447B  NBA cdn 單場 playbyplay
+      (HTML/text) <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> Y
+❌ ERR NBA stats.nba.com(預期被擋): The operation was aborted due to timeout
+✅ 200   346ms    38638B  NBA 官方裁判派遣
+      (HTML/text) <!DOCTYPE html> <html lang="en-US" prefix="og: http://ogp.me/ns# fb: http://ogp.
+✅ 200   212ms    47436B  NBA 官方傷兵報告 PDF 目錄
+      (HTML/text) <!DOCTYPE html> <html lang="en-US" prefix="og: http://ogp.me/ns# fb: http://ogp.
+✅ 200   158ms     6859B  ESPN core 單場賠率(多家)
+      count,pageIndex,pageSize,pageCount,items
+✅ 200    24ms     1715B  ESPN core 單場 predictor(BPI)
+      $ref,name,shortName,lastModified,homeTeam,awayTeam
+✅ 200    30ms    29744B  ESPN core 球隊季統計
+      $ref,season,team,splits,seasonType
+✅ 200   124ms    28507B  ESPN core 球員季統計
+      $ref,season,athlete,splits,seasonType
+✅ 200   247ms    12080B  ESPN 球員 splits
+      filters,displayName,labels,names,displayNames,descriptions,splitCategories
+✅ 200    24ms   470032B  ESPN 球員 gamelog
+      filters,labels,names,displayNames,events,seasonTypes,glossary
+✅ 200   159ms   192959B  ESPN 交易/異動
+      timestamp,status,season,requestedYear,count,pageIndex,pageSize,pageCount,transactions
+❌ 404    18ms       52B  ESPN powerindex(BPI 排名)
+      error
+✅ 200    92ms       64B  ESPN 單場 odds 歷史(line movement)
+      count,pageIndex,pageSize,pageCount,items
+✅ 200   471ms   270148B  Basketball-Reference(ToS 限制,只測可達)
+      (HTML/text)  <!DOCTYPE html> <html data-version="klecko-" data-root="/home/bbr/build" lang="
+❌ 401   238ms       12B  balldontlie API
+      (HTML/text) Unauthorized
