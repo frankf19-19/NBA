@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v2.7(ESPN BPI 回補與三來源混合、官方裁判派遣、官方傷兵報告 PDF、球員異動、球隊進階統計快照)v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -123,7 +123,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
      (舊版掃描時仍是寫死的預設參數,m 與網站不一致;mp 另以最新參數重算,不受影響) */
   if(prev.prm&&isFinite(prev.prm.hca))E(`Object.assign(PRM,${JSON.stringify(prev.prm)});PRM.src='cloud';`);
   if(prev.mb&&Array.isArray(prev.mb.g))E(`MB=${JSON.stringify(prev.mb)}`);
-  {const mkp={};for(const [id,x] of Object.entries(PRE)){if(x.mk!=null||(x.of&&x.of.length))mkp[id]={mk:x.mk??null,of:x.of||null};}
+  {const mkp={};for(const [id,x] of Object.entries(PRE)){const of=(x.ofo&&x.ofo.length)?x.ofo:(x.of||null);if(x.mk!=null||x.bpi!=null||(of&&of.length))mkp[id]={mk:x.mk??null,of,bpi:x.bpi??null};}
     E(`MK_PRE=${JSON.stringify(mkp)}`);}   /* 賽前記錄的盤口與裁判,掃描入帳時沿用(不用賽後資料) */   /* 勝分差區間機率表(昨日學得),新場次的區間預測據此凍結 */
   /* 紀錄簿不放 localStorage(上限 500 萬字元,數萬場會爆):
      預測某日時,把「該日之前最近 3,000 場」直接交給網頁的 ledger(),逐隊偏差只需每隊最近 12 場,且不偷看未來 */
@@ -166,6 +166,19 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   {const need=e=>!e.bxx&&(!(e.px>=2)||(e.sy>=seasonNow0-PBP_BACK_SEASONS&&!e.pb&&!e.pbx));
     const bk=LED.filter(need).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,BX_PER_RUN);
     if(bk.length)await fetchBox(`完整原始資料回補(剩 ${LED.filter(need).length} 場)`,bk);}
+
+  /* ESPN BPI 賽前預測(predictor):主隊勝率與預期分差,近 10 季可回補;記下 lastModified 以便只採用開打前的版本 */
+  const CORE2='https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba';
+  const fetchBPI=async id=>{try{const p=await W.jget(`${CORE2}/events/${id}/competitions/${id}/predictor`);
+      const side=p.homeTeam&&p.homeTeam.statistics?['h',p.homeTeam]:(p.awayTeam&&p.awayTeam.statistics?['a',p.awayTeam]:null);if(!side)return {x:1};
+      const g=n=>{const x=(side[1].statistics||[]).find(z=>z.name===n);return x?+x.value:null;};
+      const wp=g('gameProjection'),pd=g('teamPredPtDiff');if(wp==null)return {x:1};
+      return {hp:+((side[0]==='h'?wp:100-wp)/100).toFixed(3),pd:pd==null?null:+((side[0]==='h'?pd:-pd)).toFixed(2),lm:p.lastModified||null};
+    }catch(e){return null;}};
+  {const need=e=>e.sy>=seasonNow0-PBP_BACK_SEASONS&&!e.bpi&&!e.bpx&&!e.po;
+    const bk=LED.filter(need).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,BX_PER_RUN);let n=0;
+    for(let i=0;i<bk.length;i+=PL_BATCH){await Promise.all(bk.slice(i,i+PL_BATCH).map(async e=>{const r=await fetchBPI(e.id);if(!r)return;if(r.x)e.bpx=1;else{e.bpi=r;n++;}}));}
+    if(bk.length)console.log(`ESPN BPI 回補:${n}/${bk.length} 場(剩 ${LED.filter(need).length-bk.length} 場)`);}
 
   /* ---------- 1) 逐季、逐日回補(依時間順序,只新增不改寫;已封存賽季略過) ---------- */
   const seasonNow=+E(`seasonOf('${today}')`);
@@ -420,26 +433,36 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const mbRate=list=>{const u=list.filter(e=>e.mp!=null);if(!u.length)return null;let h=0;for(const e of u){const p=predOf(e);const t=MBT.g.length?mbPickT(MBT.g,p).i:mbPickN(p,sigmaM);if(t===homeIdx(e))h++;}return +(h/u.length*100).toFixed(1);};
   console.log(`勝分差區間:採用 ${mbUse}(回測 實戰表 ${MBT.tot.emp}% / 常態 ${MBT.tot.norm}%),σ殘差 ${sigmaM}`);
 
-  /* ---------- 3.6) 市場盤口對照:最終分差 = w×模型 + (1−w)×市場收盤讓分線;w 由歷史學,依時間順序滾動驗證(先 400 場起,每 150 場一段),
-       測試段誤差比純模型低才啟用。ESPN 只保留約一年的盤口,樣本會逐日累積 ---------- */
+  /* ---------- 3.6) 多來源混合:模型 × 市場收盤線 × ESPN BPI。各組合(模型+市場、模型+BPI、三者)分別以時間順序滾動驗證
+       (先 400 場起、每 150 場一段),測試段誤差比純模型低才啟用;權重取誤差最低者,相差 0.03 分內取模型權重最大者。
+       BPI 只採用 lastModified 早於開球時間的版本(避免賽後更新的偷看) ---------- */
   {
-    const rows=reg.filter(e=>e.mp!=null&&e.od&&(e.od.spH?.[1]!=null||e.od.sp!=null)).sort((a,b)=>a.d.localeCompare(b.d))
-      .map(e=>({p:predOf(e),k:-(e.od.spH?.[1]??e.od.sp),y:e.am}));
+    const bpiOK=e=>e.bpi&&e.bpi.pd!=null&&(!e.bpi.lm||!e.tip||Date.parse(e.bpi.lm)<=Date.parse(e.tip)+600000);
+    const mkOf=e=>(e.od&&(e.od.spH?.[1]!=null||e.od.sp!=null))?-(e.od.spH?.[1]??e.od.sp):null;
+    const base=reg.filter(e=>e.mp!=null).sort((a,b)=>a.d.localeCompare(b.d));
     const mae=(rs,f)=>rs.reduce((a,r)=>a+Math.abs(r.y-f(r)),0)/Math.max(1,rs.length);
-    /* 取誤差最低的 w;若有多個 w 誤差相差在 0.03 分內(雜訊範圍),取其中模型權重最大的——盡量保留自己的模型 */
-    const learnW=rs=>{const ms=[];for(let w=0;w<=1.0001;w+=0.05)ms.push([+w.toFixed(2),mae(rs,r=>w*r.p+(1-w)*r.k)]);const bm=Math.min(...ms.map(x=>x[1]));
-      return ms.filter(x=>x[1]<=bm+0.03).reduce((a,x)=>x[0]>a?x[0]:a,0);};
-    let tM=0,tK=0,tB=0,tn=0;
-    for(let i=400;i<rows.length;i+=150){const tr=rows.slice(0,i),te=rows.slice(i,i+150);if(te.length<50)break;
-      const w=learnW(tr);tM+=mae(te,r=>r.p)*te.length;tK+=mae(te,r=>r.k)*te.length;tB+=mae(te,r=>w*r.p+(1-w)*r.k)*te.length;tn+=te.length;}
-    const ev=tn?{model:+(tM/tn).toFixed(3),mkt:+(tK/tn).toFixed(3),blend:+(tB/tn).toFixed(3),nTest:tn}:null;
-    const use=!!(ev&&tn>=400&&ev.blend<ev.model-0.05);
-    const wF=use?learnW(rows):1;
-    /* 信心刻度比例:混合後殘差標準差 / 模型殘差標準差(同一批有盤口的比賽),網頁用它收緊 σ */
-    const sd=f=>Math.sqrt(rows.reduce((a,r)=>a+(r.y-f(r))**2,0)/Math.max(1,rows.length));
-    const sigRatio=use&&rows.length>=300?+Math.max(0.7,Math.min(1,sd(r=>wF*r.p+(1-wF)*r.k)/sd(r=>r.p))).toFixed(3):1;
-    PRMF.mk={use,w:wF,n:rows.length,eval:ev,sigRatio};
-    console.log('市場盤口對照:',JSON.stringify(PRMF.mk));
+    const sd=(rs,f)=>Math.sqrt(rs.reduce((a,r)=>a+(r.y-f(r))**2,0)/Math.max(1,rs.length));
+    /* 權重格點:ws = [模型, 其他來源...],總和 1,步長 0.05 */
+    const grid=k=>{const out=[];const rec=(pre,left,depth)=>{if(depth===k-1){out.push([...pre,+left.toFixed(2)]);return;}for(let w=0;w<=left+1e-9;w+=0.05)rec([...pre,+w.toFixed(2)],left-w,depth+1);};rec([],1,0);return out;};
+    const learn=(rs,k)=>{const G=grid(k);const ms=G.map(ws=>[ws,mae(rs,r=>ws.reduce((a,w,i)=>a+w*r.x[i],0))]);const bm=Math.min(...ms.map(x=>x[1]));
+      return ms.filter(x=>x[1]<=bm+0.03).reduce((a,x)=>x[0][0]>a[0]?x[0]:a,[-1])};
+    const evalRows=(rows,k)=>{let tM=0,tB=0,tn=0;const by={};
+      for(let i=400;i<rows.length;i+=150){const tr=rows.slice(0,i),te=rows.slice(i,i+150);if(te.length<50)break;
+        const ws=learn(tr,k);tM+=mae(te,r=>r.x[0])*te.length;tB+=mae(te,r=>ws.reduce((a,w,j)=>a+w*r.x[j],0))*te.length;tn+=te.length;
+        for(let j=1;j<k;j++)by[j]=(by[j]||0)+mae(te,r=>r.x[j])*te.length;}
+      if(!tn)return null;const ev={model:+(tM/tn).toFixed(3),blend:+(tB/tn).toFixed(3),nTest:tn};for(let j=1;j<k;j++)ev['src'+j]=+(by[j]/tn).toFixed(3);return ev;};
+    const fit=(rows,k,label)=>{const ev=evalRows(rows,k);const use=!!(ev&&ev.nTest>=400&&ev.blend<ev.model-0.05);
+      const ws=use?learn(rows,k):[1,...new Array(k-1).fill(0)];
+      const sigRatio=use&&rows.length>=300?+Math.max(0.7,Math.min(1,sd(rows,r=>ws.reduce((a,w,j)=>a+w*r.x[j],0))/sd(rows,r=>r.x[0]))).toFixed(3):1;
+      const o={use,ws,n:rows.length,eval:ev,sigRatio};console.log(label,JSON.stringify(o));return o;};
+    const rowsMK=base.filter(e=>mkOf(e)!=null).map(e=>({x:[predOf(e),mkOf(e)],y:e.am}));
+    const rowsBP=base.filter(e=>bpiOK(e)).map(e=>({x:[predOf(e),e.bpi.pd],y:e.am}));
+    const rows3=base.filter(e=>mkOf(e)!=null&&bpiOK(e)).map(e=>({x:[predOf(e),mkOf(e),e.bpi.pd],y:e.am}));
+    const MK=fit(rowsMK,2,'模型+市場:'),MKB=fit(rowsBP,2,'模型+BPI:'),MK3=fit(rows3,3,'模型+市場+BPI:');
+    PRMF.mk={use:MK.use,w:MK.ws[0],n:MK.n,eval:MK.eval,sigRatio:MK.sigRatio};
+    PRMF.mkb={use:MKB.use,w:MKB.ws[0],n:MKB.n,eval:MKB.eval,sigRatio:MKB.sigRatio};
+    PRMF.mk3={use:MK3.use,w:MK3.ws[0],wm:MK3.ws[1],wb:MK3.ws[2],n:MK3.n,eval:MK3.eval,sigRatio:MK3.sigRatio};
+    PRMF.bpiN=LED.filter(e=>e.bpi).length;
   }
   /* ---------- 3.7) 裁判因子:每位裁判過往「主隊實際 − 模型預期」收縮平均(÷(n+30)),逐季滾動驗證(只用該季之前的資料),
        有降低誤差才啟用。裁判一季只吹 40–65 場,預期多半是雜訊,所以門檻放嚴 ---------- */
@@ -457,7 +480,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     PRMF.ref={use,n:rows.length,refs:Object.keys(build(rows)).length,eval:ev};if(use)PRMF.ref.tab=build(rows);
     console.log('裁判因子:',JSON.stringify({...PRMF.ref,tab:undefined}));
   }
-  E(`Object.assign(PRM,${JSON.stringify({mk:PRMF.mk,ref:PRMF.ref})})`);
+  E(`Object.assign(PRM,${JSON.stringify({mk:PRMF.mk,mkb:PRMF.mkb,mk3:PRMF.mk3,ref:PRMF.ref})})`);
 
   /* ---------- 4) 主力缺陣係數(由完整紀錄簿學習) ---------- */
   const inj=JSON.parse(JSON.stringify(W.learnInjFactor(LED)));
@@ -487,7 +510,48 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   try{const d=await W.jget(`${SBu}/news?limit=30`);
     DAILY.news[today]=(d.articles||[]).filter(a=>a.headline).map(a=>({h:a.headline,d:(a.description||'').slice(0,200),u:a.links?.web?.href||'',t:a.published||''}));
   }catch(e){console.error('新聞快照失敗:',e.message);}
+  /* NBA 官方裁判派遣(每個比賽日約美東 9 點公布):比賽(城市 @ 城市)→ 主審/裁判/副裁/替補 */
+  let REFTODAY=[];
+  try{const h=await (await fetch('https://official.nba.com/referee-assignments/',{headers:{'User-Agent':'Mozilla/5.0 (nba-scoreboard)'},signal:AbortSignal.timeout(20000)})).text();
+    const sec=h.split(/WNBA Referee Assignments/)[0];const dm=/NBA Referee Assignments<\/h\d>\s*<[^>]*>([^<]+)/.exec(sec)||/([A-Z][a-z]+ \d{1,2}, \d{4})/.exec(sec);
+    const tbl=/<tbody>([\s\S]*?)<\/tbody>/i.exec(sec);
+    if(tbl){for(const tr of tbl[1].matchAll(/<tr>([\s\S]*?)<\/tr>/g)){const cells=[...tr[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(c=>c[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim());
+        if(cells.length>=4&&/@/.test(cells[0]))REFTODAY.push({g:cells[0],crew:cells.slice(1,4).map(x=>x.replace(/\s*\(#\d+\)/,'').trim()).filter(Boolean),alt:(cells[4]||'').replace(/\s*\(#\d+\)/,'').trim()||null});}}
+    DAILY.refs=DAILY.refs||{};DAILY.refs[today]={posted:dm?dm[1].trim():null,games:REFTODAY};
+    console.log(`官方裁判派遣:${REFTODAY.length} 場`);
+  }catch(e){console.error('裁判派遣失敗:',e.message);}
+  /* NBA 官方傷兵報告 PDF(每天多版):取最新一份,存原文與解析後的列(球隊/球員/狀態/原因) */
+  try{const idx=await (await fetch(`https://official.nba.com/nba-injury-report-${seasonNow-1}-${String(seasonNow).slice(2)}-season/`,{headers:{'User-Agent':'Mozilla/5.0 (nba-scoreboard)'},signal:AbortSignal.timeout(20000)})).text();
+    const links=[...idx.matchAll(/href="([^"]*Injury-Report_(\d{4}-\d\d-\d\d)_(\d\d)([AP]M)\.pdf)"/gi)].map(m=>({u:m[1],d:m[2],h:(+m[3]%12)+(m[4].toUpperCase()==='PM'?12:0)})).sort((a,b)=>(b.d+String(b.h).padStart(2,'0')).localeCompare(a.d+String(a.h).padStart(2,'0')));
+    DAILY.injpdf=DAILY.injpdf||{};
+    if(links.length){const L0=links[0];const key=`${L0.d}_${L0.h}`;
+      if(!Object.values(DAILY.injpdf).some(x=>x.key===key)){
+        const buf=Buffer.from(await (await fetch(L0.u,{signal:AbortSignal.timeout(30000)})).arrayBuffer());
+        let text='';try{const pdfParse=require('pdf-parse');text=(await pdfParse(buf)).text||'';}catch(e){console.error('pdf-parse 不可用:',e.message);}
+        const rows=[];let game='',team='';
+        for(const raw of text.split(/\n/)){const ln=raw.replace(/\s+/g,' ').trim();if(!ln)continue;
+          const gm=/([A-Z]{3})@([A-Z]{3})/.exec(ln);if(gm)game=gm[0];
+          const m=/^(.*?)(Out|Doubtful|Questionable|Probable|Available)\s*(.*)$/.exec(ln);
+          if(m){const left=m[1].trim();const tm=/^([A-Z][A-Za-z.' ]+?(?:ers|cs|ks|ls|ns|rs|ts|zz|s|z|ic|at)) /.exec(left);
+            const pm=/([A-Z][A-Za-z.'-]+, [A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.]+)?)\s*$/.exec(left);
+            rows.push({g:game,t:left.replace(pm?pm[1]:'','').trim().slice(0,40),p:pm?pm[1]:left.slice(-40),s:m[2],r:m[3].slice(0,80)});}}
+        DAILY.injpdf[today]={key,url:L0.u,n:rows.length,rows,raw:text.slice(0,60000)};
+        console.log(`官方傷兵報告:${L0.d} ${L0.h}:00,解析 ${rows.length} 列,原文 ${text.length} 字`);}}
+  }catch(e){console.error('官方傷兵報告失敗:',e.message);}
+  /* 球員異動(簽約、交易、釋出) */
+  try{const d=await W.jget(`${SBu}/transactions?limit=100`);DAILY.tx=DAILY.tx||{};
+    const seen=new Set(Object.values(DAILY.tx).flat().map(x=>x.d+'|'+x.t+'|'+x.s));const add=[];
+    for(const x of (d.transactions||[])){const o={d:(x.date||'').slice(0,10),t:+(x.team?.id||0),ab:x.team?.abbreviation||'',s:(x.description||'').slice(0,200)};if(!seen.has(o.d+'|'+o.t+'|'+o.s)){seen.add(o.d+'|'+o.t+'|'+o.s);add.push(o);}}
+    if(add.length)DAILY.tx[today]=add;console.log(`球員異動:新增 ${add.length} 筆`);
+  }catch(e){console.error('球員異動失敗:',e.message);}
   fs.writeFileSync(F_DAILY,JSON.stringify(DAILY));
+  /* ESPN 球隊進階季統計(真實命中率、節奏、助攻率、失誤率、籃板率等 ~150 項)每 7 天快照 */
+  try{const F_TS=path.join(D_SEED,`teamstats-${seasonNow}.json`);const TSH=readJSON(F_TS,{});const last=Object.keys(TSH).sort().pop();
+    if(!last||(Date.parse(today)-Date.parse(last))/864e5>=PDB_SNAP_DAYS){const o={};
+      for(let tid=1;tid<=30;tid++){try{const st=await W.jget(`${CORE2}/seasons/${seasonNow}/types/2/teams/${tid}/statistics`);const m={};
+        ((st.splits||{}).categories||[]).forEach(c=>(c.stats||[]).forEach(x=>{if(x.name&&isFinite(+x.value))m[x.name]=+(+x.value).toFixed(3);}));if(Object.keys(m).length)o[tid]=m;}catch(e){}}
+      if(Object.keys(o).length>=20){TSH[today]=o;fs.writeFileSync(F_TS,JSON.stringify(TSH));console.log('球隊進階統計快照',today,Object.keys(o).length,'隊');}}
+  }catch(e){console.error('球隊進階統計失敗:',e.message);}
   /* 球員資料庫每 7 天存一份快照(每人:隊、出賽、分鐘、得分、籃板、助攻、抄截、火鍋、失誤、FG%、3P%、FT%) */
   try{const F_PH=path.join(D_SEED,`pdbhist-${seasonNow}.json`);const PH=readJSON(F_PH,{});
     const last=Object.keys(PH).sort().pop();
@@ -515,10 +579,16 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         let hw=0,aw=0;(seas[ids.indexOf(g.homeId)]||[]).forEach(r=>{if(r.done&&r.oppId===g.awayId&&r.pf!=null&&r.date<d){if(r.won)hw++;else aw++;}});
         g._h2h={hw,aw};g._eff=EF;
         const info=await W.fetchGameInfo(g.id);if(info.mk!=null){g._mk=info.mk;g._mkPv=info.mkPv;}if(info.of&&info.of.length)g._of=info.of;
+        const bp=await fetchBPI(g.id);if(bp&&!bp.x&&bp.pd!=null)g._bpi=bp.pd;
+        /* 官方裁判派遣:以城市名對應(Cleveland @ Philadelphia ↔ Cleveland Cavaliers @ Philadelphia 76ers;LA Lakers/LA Clippers 另處理) */
+        const norm=x=>String(x).toLowerCase().replace(/^l\.?a\.? /,'los angeles ').replace(/[^a-z ]/g,'').trim();
+        let ofo=null;if(d===today&&REFTODAY.length){const row=REFTODAY.find(r=>{const [a,h]=r.g.split('@').map(norm);return a&&h&&norm(g.away).startsWith(a)&&norm(g.home).startsWith(h);});if(row)ofo=row.crew;}
+        if(ofo&&ofo.length)g._of=ofo;
         const p=W.predict(g,pm,lg,d);if(p.raw_margin_pre==null)continue;
         const ih=W.injInfo(g.homeId),ia=W.injInfo(g.awayId);
         PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),mm:+p.raw_margin.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
-          hn:ih.names,an:ia.names,p:+p.home_prob.toFixed(3),mb:p.mb,mbp:+(+p.mbp).toFixed(3),mk:info.mk??null,ou:info.ou??null,of:info.of||[],
+          hn:ih.names,an:ia.names,p:+p.home_prob.toFixed(3),mb:p.mb,mbp:+(+p.mbp).toFixed(3),mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
+          bpi:(bp&&!bp.x)?bp.pd:null,bpiP:(bp&&!bp.x)?bp.hp:null,
           k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString()};preN++;
       }
       E('INJ_READY=false');

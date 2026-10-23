@@ -447,7 +447,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.6 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.7 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -806,13 +806,22 @@ async function fetchGameInfo(gid){
     giCache[gid]={ts:Date.now(),v};return v;
   }catch(e){return {mk:null,of:[]};}
 }
+let PREG={ts:0,sy:null,v:null};
+async function loadPregame(date){   /* 雲端賽前檔:盤口、官方裁判、ESPN BPI(網頁無法直接跨域抓 BPI,靠雲端每天記) */
+  const sy=seasonOf(date);if(PREG.v&&PREG.sy===sy&&Date.now()-PREG.ts<600000)return PREG.v;
+  try{const r=await fetch(`seed/pregame-${sy}.json?t=${Math.floor(Date.now()/600000)}`,{cache:'no-store'});PREG={ts:Date.now(),sy,v:r.ok?await r.json():{}};}catch(e){PREG={ts:Date.now(),sy,v:{}};}
+  return PREG.v;
+}
 async function attachGameInfo(games,date){
-  const need=(PRM.mk&&PRM.mk.use)||(PRM.ref&&PRM.ref.use);
+  const need=(PRM.mk&&PRM.mk.use)||(PRM.ref&&PRM.ref.use)||(PRM.mkb&&PRM.mkb.use)||(PRM.mk3&&PRM.mk3.use);
   if(!need)return;
+  const PG=(window.__CLOUD_BUILD?null:await loadPregame(date))||{};
   await Promise.all(games.map(async g=>{
-    if(MK_PRE&&MK_PRE[g.id]){const x=MK_PRE[g.id];if(x.mk!=null)g._mk=x.mk;if(x.of)g._of=x.of;return;}
+    const pg=PG[g.id];if(pg){if(pg.bpi!=null)g._bpi=pg.bpi;if(pg.ofo&&pg.ofo.length)g._of=pg.ofo;}
+    if(MK_PRE&&MK_PRE[g.id]){const x=MK_PRE[g.id];if(x.mk!=null)g._mk=x.mk;if(x.of)g._of=x.of;if(x.bpi!=null)g._bpi=x.bpi;return;}
     if(g.stype===1)return;
-    const x=await fetchGameInfo(g.id);if(x.mk!=null){g._mk=x.mk;g._mkPv=x.mkPv;}if(x.of&&x.of.length)g._of=x.of;
+    const x=await fetchGameInfo(g.id);if(x.mk!=null){g._mk=x.mk;g._mkPv=x.mkPv;}if(x.of&&x.of.length&&!g._of)g._of=x.of;
+    if(g._mk==null&&pg&&pg.mk!=null)g._mk=pg.mk;
   }));
 }
 function refAdj(offs){
@@ -1080,11 +1089,19 @@ function predict(g,pm,lg,date){
   /* 市場盤口對照:有盤口且雲端驗證有效時,最終分差 = w × 模型 + (1−w) × 市場 */
   let mkTxt='';
   let sigUse=RUN_SIGMA;
-  if(PRM.mk&&PRM.mk.use&&Number.isFinite(g._mk)){
-    const w=Math.max(0,Math.min(1,+PRM.mk.w));margin=w*modelMargin+(1-w)*g._mk;
-    if(PRM.mk.sigRatio>0)sigUse=RUN_SIGMA*PRM.mk.sigRatio;   /* 混合後分差較準,信心刻度依歷史殘差比例同步收緊 */
-    mkTxt=`市場盤口對照:${g._mkPv?g._mkPv+' ':''}讓分線預期主隊 ${P1(g._mk)} 分、模型 ${P1(modelMargin)} 分,依歷史驗證以模型 ${Math.round(w*100)}% + 市場 ${Math.round((1-w)*100)}% 混合為 ${P1(margin)} 分。`;
-    factors.push('市場盤口對照');
+  /* 多來源混合(雲端滾動驗證後決定啟用與權重):模型 × 市場收盤線 × ESPN BPI */
+  const hasMk=Number.isFinite(g._mk),hasBp=Number.isFinite(g._bpi);
+  const M3=PRM.mk3,M2=PRM.mk,MB2=PRM.mkb;
+  const pc=v=>Math.round(v*100)+'%';
+  if(hasMk&&hasBp&&M3&&M3.use){
+    margin=M3.w*modelMargin+M3.wm*g._mk+M3.wb*g._bpi;if(M3.sigRatio>0)sigUse=RUN_SIGMA*M3.sigRatio;
+    mkTxt=`多來源混合:模型 ${P1(modelMargin)}、市場讓分線 ${P1(g._mk)}、ESPN BPI ${P1(g._bpi)} 分,依歷史驗證以 ${pc(M3.w)} / ${pc(M3.wm)} / ${pc(M3.wb)} 混合為 ${P1(margin)} 分。`;factors.push('市場盤口與 BPI 對照');
+  }else if(hasMk&&M2&&M2.use){
+    const w=Math.max(0,Math.min(1,+M2.w));margin=w*modelMargin+(1-w)*g._mk;if(M2.sigRatio>0)sigUse=RUN_SIGMA*M2.sigRatio;
+    mkTxt=`市場盤口對照:${g._mkPv?g._mkPv+' ':''}讓分線預期主隊 ${P1(g._mk)} 分、模型 ${P1(modelMargin)} 分,依歷史驗證以模型 ${pc(w)} + 市場 ${pc(1-w)} 混合為 ${P1(margin)} 分。`;factors.push('市場盤口對照');
+  }else if(hasBp&&MB2&&MB2.use){
+    const w=Math.max(0,Math.min(1,+MB2.w));margin=w*modelMargin+(1-w)*g._bpi;if(MB2.sigRatio>0)sigUse=RUN_SIGMA*MB2.sigRatio;
+    mkTxt=`ESPN BPI 對照:BPI 預期主隊 ${P1(g._bpi)} 分、模型 ${P1(modelMargin)} 分,依歷史驗證以模型 ${pc(w)} + BPI ${pc(1-w)} 混合為 ${P1(margin)} 分。`;factors.push('BPI 對照');
   }
   /* 裁判因子:雲端驗證有效時才套用 */
   let refTxt='';const ra=refAdj(g._of);
@@ -1106,7 +1123,7 @@ function predict(g,pm,lg,date){
   return {home_prob:hp,away_prob:1-hp,predicted_winner:fav,home_score_pred:hs,away_score_pred:as,
     exp_home:+expHome.toFixed(1),exp_away:+expAway.toFixed(1),
     margin:Math.abs(margin),raw_margin:margin,raw_margin_pre:marginPre,why,factors,f:fvec,
-    mb:mb.i,mbp:mb.p,mbProbs:mb.probs,mbSrc:mb.src,mk:Number.isFinite(g._mk)?g._mk:null,model_margin:modelMargin,sigma:sigUse,
+    mb:mb.i,mbp:mb.p,mbProbs:mb.probs,mbSrc:mb.src,mk:Number.isFinite(g._mk)?g._mk:null,bpi:Number.isFinite(g._bpi)?g._bpi:null,model_margin:modelMargin,sigma:sigUse,
     injHit:!!(injTxt),restAdjusted:(rH!=null&&rA!=null),moAdjusted:(mH!=null&&mA!=null)};
 }
 /* 以紀錄簿凍結值覆寫顯示用預測:最終分差 mm、區間 mb、當時盤口 mk */
@@ -1215,6 +1232,7 @@ function gameCard(g,p,rv){
   const ldrSeg=(g.aLdr||g.hLdr)?`看點 ${[ldrHtml(g.aLdr,isLive||isFinal),ldrHtml(g.hLdr,isLive||isFinal)].filter(Boolean).join(' vs ')}`:null;
   const meta=[g.stype===1?'熱身賽(不列入命中統計與校準)':null,
     Number.isFinite(g._mk)?`盤口 主隊 ${g._mk>0?'-':'+'}${Math.abs(g._mk)}`:null,
+    Number.isFinite(g._bpi)?`ESPN BPI 主隊 ${g._bpi>0?'+':''}${g._bpi}`:null,
     g.startTpe?('台灣時間 '+g.startTpe):null,
     g.venue,
     (!isFinal&&!isLive)?ldrSeg:null,
@@ -1979,7 +1997,7 @@ function renderFooter(){
     `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.6 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.7 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -2072,8 +2090,10 @@ function renderCalibHist(){
     const lf=cloudFresh()&&CLOUD.inj?CLOUD.inj:learnInjFactor();
     html+=`<div class="tag" style="margin-top:8px">🗂 球員資料庫:${npl} 名球員 · ${Object.keys(PDB.teams).length} 隊 · 更新於 ${new Date(PDB.ts).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})} · 紀錄簿已含球員數據 ${withPl} 場</div>
       <div class="tag" style="margin-top:4px">主力缺陣自學:樣本 ${lf.n} 場${lf.n?`,缺陣時平均殘差 ${lf.r>=0?'+':''}${lf.r.toFixed(1)} 分`:''} → 傷兵折算係數 ${lf.f}${lf.learned?'(已由紀錄簿學得)':'(預設,滿 30 場後自動學習)'}</div>`;
-    const mkE=PRM.mk||{},rfE=PRM.ref||{};
-    html+=`<div class="tag" style="margin-top:4px">📈 市場盤口對照(模型 vs DraftKings 收盤讓分線,依時間順序滾動驗證):${mkE.eval?`測試 ${mkE.eval.nTest} 場,分差誤差 模型 ${mkE.eval.model} / 市場 ${mkE.eval.mkt} / 混合 ${mkE.eval.blend}`:'樣本累積中(ESPN 只保留約一年的盤口)'} → ${mkE.use?`已啟用,模型權重 ${Math.round(mkE.w*100)}%`:'未啟用'}(累計 ${mkE.n??0} 場有盤口)</div>
+    const mkE=PRM.mk||{},rfE=PRM.ref||{},m3=PRM.mk3||{},mbE=PRM.mkb||{};
+    const evs=(o,names)=>o.eval?`測試 ${o.eval.nTest} 場,分差誤差 模型 ${o.eval.model}${names.map((n,i)=>` / ${n} ${o.eval['src'+(i+1)]??'-'}`).join('')} / 混合 ${o.eval.blend}`:'樣本累積中';
+    html+=`<div class="tag" style="margin-top:4px">📈 市場盤口對照(模型 vs DraftKings 收盤讓分線,依時間順序滾動驗證):${evs(mkE,['市場'])} → ${mkE.use?`已啟用,模型權重 ${Math.round(mkE.w*100)}%`:'未啟用'}(累計 ${mkE.n??0} 場有盤口)</div>
+      <div class="tag" style="margin-top:4px">🧮 ESPN BPI 對照:${evs(mbE,['BPI'])} → ${mbE.use?`已啟用,模型權重 ${Math.round(mbE.w*100)}%`:'未啟用'}(累計 ${PRM.bpiN??0} 場有 BPI);三來源(模型/市場/BPI):${evs(m3,['市場','BPI'])} → ${m3.use?`已啟用,權重 ${Math.round(m3.w*100)}% / ${Math.round(m3.wm*100)}% / ${Math.round(m3.wb*100)}%`:'未啟用'}</div>
       <div class="tag" style="margin-top:4px">🦓 裁判因子(每位裁判過往主隊相對模型的收縮偏差,逐季驗證):${rfE.eval?`測試 ${rfE.eval.nTest} 場,誤差 不用 ${rfE.eval.model} / 用 ${rfE.eval.withRef}`:'樣本累積中'} → ${rfE.use?'已啟用':'未啟用(未見改善或樣本不足)'}(${rfE.refs??0} 位裁判、${rfE.n??0} 場)</div>`;
     const hh2=(CLOUD&&CLOUD.health)||{},ipg=CLOUD&&CLOUD.injPG;
     if(hh2.withBx!=null)html+=`<div class="tag" style="margin-top:4px">🗄 自有資料庫:完整 box score(全員全欄位、各節比分、球隊全部統計、場館與觀眾)${hh2.withBx} 場${hh2.withBx<hh2.games?`(歷史場次每日自動回補,剩 ${hh2.games-hh2.withBx} 場)`:'(全部賽季已補齊)'};賽前含傷兵預測 ${hh2.withPg??0} 場;每日另存官方傷兵名單、戰績榜、新聞與每週球員資料庫快照</div>
@@ -2108,7 +2128,7 @@ async function samplesForDate(date){
       const pm={};await Promise.all(ids.map(async(id,j)=>{pm[id]=await statsWithPrior(id,season,asOf,date,seas[j]);}));
       const lg=leagueRPG(pm);
       const EFF=effTable(date,season);
-      if(MK_PRE)games.forEach(g=>{const x=MK_PRE[g.id];if(x){if(x.mk!=null)g._mk=x.mk;if(x.of)g._of=x.of;}});
+      if(MK_PRE)games.forEach(g=>{const x=MK_PRE[g.id];if(x){if(x.mk!=null)g._mk=x.mk;if(x.of)g._of=x.of;if(x.bpi!=null)g._bpi=x.bpi;}});
       const rById={};ids.forEach((id,j)=>rById[id]=seas[j]||[]);
       games.forEach(g=>{
         let h2w=0,h2l=0;
