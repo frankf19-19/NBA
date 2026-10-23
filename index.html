@@ -171,6 +171,8 @@
   .mbb .mbr i{display:block;height:100%;background:var(--teal);border-radius:3px} .mbb.on .mbr i{background:var(--amber)}
   .mbb .mbv{font-family:var(--mono);font-size:12px;font-weight:600;text-align:center;color:var(--chalk)}
   .mbfoot{font-size:12px;color:var(--muted);margin-top:5px}
+  .meta.sty{margin-top:6px;line-height:1.7} .meta.sty b{color:var(--ink2);font-weight:600}
+  .h2hbox{margin-top:6px} .h2hbox table.stat td{padding:5px 10px;font-size:12.5px}
   @media (max-width:520px){.mbrow{grid-template-columns:repeat(3,1fr)}}
   .meta{color:var(--muted);font-size:12.5px;font-family:var(--mono);margin-top:2px}
   .scorepred b{color:var(--teal);font-family:var(--mono)}
@@ -445,7 +447,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.5 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.6 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -757,6 +759,42 @@ let MB=null;
    盤口:ESPN 單場 summary 的 pickcenter(DraftKings),主隊讓分線 → 市場預期主隊分差 = −讓分線;
    混合權重 w(模型)由歷史學得。裁判:每位裁判過往「主隊實際 − 模型預期」的收縮平均。 */
 let MK_PRE=null;   /* 雲端掃描時注入:賽前記錄的盤口與裁判(依比賽 id) */
+/* ---------- 球隊風格、教練(雲端由自有 box score 統計)與歷年對戰紀錄(seed/h2h.json,點開才抓) ---------- */
+let STY=null,H2H=null;
+function styleOf(tid,date){
+  if(!STY)return null;const sy=seasonOf(date);
+  const cur=STY[sy]&&STY[sy][tid],prev=STY[sy-1]&&STY[sy-1][tid];
+  if(cur&&cur.g>=8)return Object.assign({sy},cur);
+  if(prev)return Object.assign({sy:sy-1},prev);
+  return cur?Object.assign({sy},cur):null;
+}
+function styleHtml(g,date){
+  const H=styleOf(g.homeId,date),A=styleOf(g.awayId,date);if(!H||!A)return '';
+  const f=(a,b,fmt)=>`${fmt(a)} / ${fmt(b)}`;const n1=v=>v==null?'-':(+v).toFixed(1),n0=v=>v==null?'-':Math.round(+v);
+  const rows=[['節奏(回合/場)',f(A.pace,H.pace,n1)],['三分出手率',f(A.p3r,H.p3r,v=>v==null?'-':n0(v)+'%')],['禁區得分',f(A.paint,H.paint,n0)],['快攻得分',f(A.fb,H.fb,n0)],
+    ['失誤率',f(A.tovr,H.tovr,v=>v==null?'-':n1(v)+'%')],['助攻率',f(A.astr,H.astr,v=>v==null?'-':n0(v)+'%')],['場均得/失',`${n1(A.pts)}/${n1(A.opp)} · ${n1(H.pts)}/${n1(H.opp)}`]];
+  const coach=(A.coach||H.coach)?`教練:${esc(A.coach||'-')} vs ${esc(H.coach||'-')} · `:'';
+  return `<div class="meta sty">${coach}風格對比(客 / 主,${H.sy===seasonOf(date)?'本季':'上季'} ${A.g}/${H.g} 場):${rows.map(([k,v])=>`${k} <b>${esc(v)}</b>`).join(' · ')}</div>`;
+}
+async function loadH2HFile(){
+  if(H2H)return H2H;
+  try{const r=await fetch('seed/h2h.json?t='+Math.floor(Date.now()/3600000),{cache:'force-cache'});if(r.ok)H2H=await r.json();}catch(e){}
+  return H2H||{};
+}
+async function showH2H(el,g,date){
+  el.textContent='讀取歷年對戰…';
+  const H=await loadH2HFile();const k=Math.min(g.homeId,g.awayId)+'-'+Math.max(g.homeId,g.awayId);
+  const rows=(H[k]||[]).filter(r=>r[0]<date).sort((a,b)=>b[0].localeCompare(a[0]));
+  if(!rows.length){el.textContent='紀錄簿中沒有兩隊過往交手紀錄。';return;}
+  const last=rows.slice(0,12);
+  const win=r=>{const homeIsG=r[1]===g.homeId;const hw=r[2]>r[3];return (homeIsG?hw:!hw);};  /* 本場主隊是否贏了那一場 */
+  const n10=rows.slice(0,10),w10=n10.filter(win).length;
+  const marg=n10.reduce((a,r)=>a+(r[1]===g.homeId?(r[2]-r[3]):(r[3]-r[2])),0)/n10.length;
+  const line=r=>{const home=r[1]===g.homeId?g.home:g.away,away=r[1]===g.homeId?g.away:g.home;
+    return `<tr><td>${r[0]}${r[4]?' 季後賽':''}</td><td>${esc(shortTeam(away))} @ ${esc(shortTeam(home))}</td><td>${r[3]}:${r[2]}</td><td style="color:${win(r)?'var(--hit)':'var(--miss)'}">${esc(shortTeam(win(r)?g.home:g.away))} 贏 ${Math.abs(r[2]-r[3])}</td></tr>`;};
+  el.innerHTML=`<div style="font-size:13px;margin-bottom:6px">歷年交手 <b>${rows.length}</b> 場(紀錄簿 1994-95 季起);最近 ${n10.length} 場 ${esc(shortTeam(g.home))} ${w10} 勝 ${n10.length-w10} 敗,平均淨勝 ${(marg>0?'+':'')+marg.toFixed(1)} 分</div>
+    <div class="table-wrap"><table class="stat" style="min-width:380px"><tr><th>日期</th><th>對戰</th><th>比分(客:主)</th><th>結果</th></tr>${last.map(line).join('')}</table></div>`;
+}
 const giCache={};   /* 單場盤口/裁判快取 10 分鐘:Live 每 45 秒自動更新時不必重抓 */
 async function fetchGameInfo(gid){
   const c=giCache[gid];if(c&&Date.now()-c.ts<600000)return c.v;
@@ -1226,6 +1264,8 @@ function gameCard(g,p,rv){
     <div class="g-top">${teamsHtml}${pill}${gdayBtn}</div>
     ${meta?`<div class="meta">${meta}</div>`:''}
     <div class="meta" id="h2h-${g.id}"></div>
+    ${styleHtml(g,$('datePick').value)}
+    <div class="meta"><button class="gday h2hbtn" data-h2h="${g.id}">歷年對戰紀錄 ▸</button></div><div class="h2hbox" id="h2hbox-${g.id}"></div>
     ${liveRow}
     ${predLine}
     ${mbHtml}
@@ -1506,6 +1546,10 @@ function bindTeamClicks(){
     if(el.dataset.bound)return;el.dataset.bound='1';
     el.addEventListener('click',()=>showGame(el.dataset.gid));});
   bindPlayerClicks($('games'));
+  document.querySelectorAll('#games .h2hbtn[data-h2h]').forEach(el=>{
+    if(el.dataset.bound)return;el.dataset.bound='1';
+    el.addEventListener('click',()=>{const g=curGames.find(x=>String(x.id)===el.dataset.h2h);const box=$('h2hbox-'+el.dataset.h2h);if(!g||!box)return;
+      if(box.innerHTML){box.innerHTML='';el.textContent='歷年對戰紀錄 ▸';return;}el.textContent='歷年對戰紀錄 ▾';showH2H(box,g,$('datePick').value);});});
   /* 手機:預測理由預設收成三行,點一下展開 */
   if(matchMedia('(max-width:640px)').matches)document.querySelectorAll('#games .why.reason').forEach(el=>{
     if(el.dataset.clamp)return;el.dataset.clamp='1';el.classList.add('clamp');
@@ -1900,6 +1944,7 @@ async function loadCloud(){
         MARGIN_K=+c.k;RUN_SIGMA=+c.sigma;if(isFinite(c.injF))INJ_F=+c.injF;
         if(c.prm&&isFinite(c.prm.hca)){Object.assign(PRM,c.prm);PRM.src='cloud';}
         if(c.mb&&Array.isArray(c.mb.g))MB=c.mb;
+        if(c.styles)STY=c.styles;
         if(cloudFresh()){localStorage.setItem('nba_mk',String(MARGIN_K));localStorage.setItem('nba_sigma',String(RUN_SIGMA));}}}
   }catch(e){}
   renderFooter();
@@ -1934,7 +1979,7 @@ function renderFooter(){
     `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.5 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.6 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();

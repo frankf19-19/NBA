@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -33,9 +33,11 @@ const F_PDB=path.join(ROOT,'pdb.json');
 const FIT_DAYS=60;        // K/σ 擬合窗口(以最後一個有比賽的日期往回算)
 const HIST_MAX=120;
 const PL_BATCH=8;         // box score 併發數
-const BX_PER_RUN=+(process.env.BX_PER_RUN||2500);   // 每次執行回補完整原始資料的歷史場次上限(約 3~4 分鐘)
+const BX_PER_RUN=+(process.env.BX_PER_RUN||4000);   // 每次執行回補完整原始資料的歷史場次上限(約 3~5 分鐘)
+const zlib=require('zlib');
 const PDB_SNAP_DAYS=7;    // 球員資料庫快照間隔(天)
-const PBP_BACK_SEASONS=+(process.env.PBP_BACK_SEASONS||1);   // 逐球紀錄回補到幾季前(預設上季起;每季約 70MB 原始 JSON)
+const PBP_BACK_SEASONS=+(process.env.PBP_BACK_SEASONS||10);   // 逐球紀錄回補到幾季前(預設 10 季;以 gzip 存,每季約 8MB)
+const GI_MAX_AGE=3;   // 該場賽前傷兵只在比賽後 3 天內擷取才可信(ESPN 舊比賽的 summary 傷兵欄是「現在」的名單)
 
 /* ---------- 網路(可注入模擬器做離線測試) ---------- */
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -91,6 +93,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
 !/^\d{4}-\d\d-\d\d$/.test(e.d||'')){fixed++;continue;}
       if(!e.sy)e.sy=(+e.d.slice(5,7)>=8)?+e.d.slice(0,4)+1:+e.d.slice(0,4);
       if(e.hs==null&&e.ts&&e.ts.h&&e.ts.a){e.hs=e.ts.h[0];e.as=e.ts.a[0];}   /* 終場比分:舊資料由球隊數據補回 */
+      if(e.gi&&!e.giT){delete e.gi;}   /* 舊版在賽後很久才擷取的「賽前傷兵」其實是現在的名單,不可信,移除 */
       if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1]){e.sy=2020;e.nu=1;}
       const gk=e.d+'|'+e.hid+'|'+e.aid;   /* ESPN 偶有同一場比賽登錄兩次(不同編號),同日同主客組合只留一筆 */
       if(seenKey.has(gk)){fixed++;continue;}
@@ -133,13 +136,16 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   /* 每場 box score 寫入紀錄簿:精簡版(pl/ts,模型學習用)+ 完整原始版(bx 全員全欄位、tst 球隊全部統計、ls 各節比分、hs/as 終場比分、場館/觀眾/開球時間)
      ——完整版是我們自己的資料庫,不依賴 ESPN 日後還留不留 */
   /* 逐球紀錄按日期存檔 seed/pbp-SY/YYYY-MM-DD.json(當天所有場次),上季起;更早賽季只存 box score 與裁判/盤口/賽前傷兵 */
-  const PBP_DAYS={};const pbpFile=(sy,d)=>path.join(D_SEED,`pbp-${sy}`,`${d}.json`);
-  const pbpStore=(e,pbp)=>{const f=pbpFile(e.sy,e.d);if(!PBP_DAYS[f]){PBP_DAYS[f]=readJSON(f,{});}PBP_DAYS[f][e.id]=pbp;e.pb=1;};
+  const PBP_DAYS={};const pbpFile=(sy,d)=>path.join(D_SEED,`pbp-${sy}`,`${d}.json.gz`);
+  const readGz=f=>{try{return JSON.parse(zlib.gunzipSync(fs.readFileSync(f)).toString('utf8'));}catch(e){return null;}};
+  const pbpLoad=f=>readGz(f)||readJSON(f.replace(/\.gz$/,''),{});   /* 相容舊的未壓縮檔 */
+  const pbpStore=(e,pbp)=>{const f=pbpFile(e.sy,e.d);if(!PBP_DAYS[f]){PBP_DAYS[f]=pbpLoad(f);}PBP_DAYS[f][e.id]=pbp;e.pb=1;};
   const applyBox=(e,r0)=>{const r=JSON.parse(JSON.stringify(r0));
     if(!e.pl)e.pl=r.pl;if(r.hid>=1&&r.hid<=30&&r.aid>=1&&r.aid<=30){e.hid=r.hid;e.aid=r.aid;}
     if(r.ts)e.ts=r.ts;else e.tsx=1;
     if(r.bx)e.bx=r.bx;else e.bxx=1;
-    for(const k of ['tst','ls','hs','as','ven','att','tip','of','od','gi','ss'])if(r[k]!=null)e[k]=r[k];
+    for(const k of ['tst','ls','hs','as','ven','att','tip','of','od','ss'])if(r[k]!=null)e[k]=r[k];
+    if(r.gi&&(Date.parse(today)-Date.parse(e.d))/864e5<=GI_MAX_AGE){e.gi=r.gi;e.giT=today;}
     if(r.pbp&&r.pbp.plays&&r.pbp.plays.length&&e.sy>=seasonNow0-PBP_BACK_SEASONS)pbpStore(e,r.pbp);
     e.px=2;};   /* px = 完整過程擷取版本 */
   const fetchBox=async(label,list)=>{
@@ -523,6 +529,51 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   }catch(e){console.error('賽前預測失敗:',e.message);}
   console.log(`每日快照:傷兵 ${(DAILY.inj[today]||[]).length} 筆、戰績 ${Object.keys(DAILY.st[today]||{}).length} 隊、新聞 ${(DAILY.news[today]||[]).length} 則;賽前預測記錄 ${preN} 場`);
 
+  /* ---------- 5.55) 教練(各季各隊總教練,ESPN core API;本季每天更新,歷史賽季一次補齊)、對戰索引、球隊風格 ---------- */
+  const F_COACH=path.join(D_SEED,'coaches.json');const COACH=readJSON(F_COACH,{});
+  try{
+    const teamIds=[...new Set(LED.filter(e=>e.sy>=seasonNow-1).flatMap(e=>[e.hid,e.aid]))].filter(x=>x>=1&&x<=30);
+    const need=[];for(let sy=FIRST_SEASON;sy<=seasonNow;sy++){if(sy===seasonNow||!COACH[sy]||Object.keys(COACH[sy]).length<25)need.push(sy);}
+    let calls=0;
+    for(const sy of need.slice(-3).concat(need.length>3?need.slice(0,-3).slice(0,2):[])){   /* 每次最多處理 5 季,幾天內補完 */
+      const o=COACH[sy]||{};
+      for(const tid of (teamIds.length?teamIds:Array.from({length:30},(_,i)=>i+1))){
+        try{const a=await W.jget(`https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/${sy}/teams/${tid}/coaches`);calls++;
+          const ref=((a.items||[])[0]||{}).$ref;if(!ref)continue;
+          const c=await W.jget(ref.replace('http://','https://'));calls++;
+          o[tid]={id:+c.id,n:`${c.firstName||''} ${c.lastName||''}`.trim(),exp:c.experience??null};
+        }catch(e){}
+      }
+      if(Object.keys(o).length)COACH[sy]=o;
+    }
+    fs.writeFileSync(F_COACH,JSON.stringify(COACH));
+    console.log(`教練:${Object.keys(COACH).length} 季已有資料(本次 ${calls} 次查詢)`);
+  }catch(e){console.error('教練資料失敗:',e.message);}
+  /* 對戰索引:兩隊歷年每一場(日期、主客、比分),供網頁點「對戰紀錄」即時查 */
+  try{const H2={};
+    for(const e of LED){if(e.hs==null)continue;const k=Math.min(e.hid,e.aid)+'-'+Math.max(e.hid,e.aid);(H2[k]=H2[k]||[]).push([e.d,e.hid,e.hs,e.as,e.po?1:0,e.id]);}
+    fs.writeFileSync(path.join(D_SEED,'h2h.json'),JSON.stringify(H2));
+  }catch(e){console.error('對戰索引失敗:',e.message);}
+  /* 球隊風格(本季與上季):節奏、三分出手率、罰球率、進攻籃板率、失誤率、助攻率、禁區得分、快攻得分、最大領先、領先易手 */
+  const STY={};
+  try{
+    const pair=v=>{const m=/(\d+)-(\d+)/.exec(String(v||''));return m?[+m[1],+m[2]]:null;};
+    for(const sy of [seasonNow-1,seasonNow]){const T={};
+      for(const e of LED){if(e.sy!==sy||e.po||!e.tst||!e.ts||e.hs==null)continue;
+        for(const [sd,tid,pf,pa,ts] of [['h',e.hid,e.hs,e.as,e.ts.h],['a',e.aid,e.as,e.hs,e.ts.a]]){
+          const st=e.tst[sd];if(!st)continue;const x=T[tid]=T[tid]||{g:0,pf:0,pa:0,fga:0,p3a:0,fta:0,orb:0,drb:0,tov:0,ast:0,fgm:0,paint:0,fb:0,ll:0,lc:0,poss:0};
+          const fg=pair(st['fieldGoalsMade-fieldGoalsAttempted']),p3=pair(st['threePointFieldGoalsMade-threePointFieldGoalsAttempted']),ft=pair(st['freeThrowsMade-freeThrowsAttempted']);
+          x.g++;x.pf+=pf;x.pa+=pa;if(fg){x.fga+=fg[1];x.fgm+=fg[0];}if(p3)x.p3a+=p3[1];if(ft)x.fta+=ft[1];
+          x.orb+=+st.offensiveRebounds||0;x.drb+=+st.defensiveRebounds||0;x.tov+=+st.totalTurnovers||+st.turnovers||0;x.ast+=+st.assists||0;
+          x.paint+=+st.pointsInPaint||0;x.fb+=+st.fastBreakPoints||0;x.ll+=+st.largestLead||0;x.lc+=+st.leadChanges||0;
+          x.poss+=W.possOf(ts);}}
+      const o={};for(const [tid,x] of Object.entries(T)){if(x.g<3)continue;
+        o[tid]={g:x.g,pace:+(x.poss/x.g).toFixed(1),pts:+(x.pf/x.g).toFixed(1),opp:+(x.pa/x.g).toFixed(1),p3r:x.fga?+(x.p3a/x.fga*100).toFixed(1):null,ftr:x.fga?+(x.fta/x.fga*100).toFixed(1):null,
+          tovr:x.poss?+(x.tov/x.poss*100).toFixed(1):null,astr:x.fgm?+(x.ast/x.fgm*100).toFixed(1):null,paint:+(x.paint/x.g).toFixed(1),fb:+(x.fb/x.g).toFixed(1),ll:+(x.ll/x.g).toFixed(1),lc:+(x.lc/x.g).toFixed(1),
+          coach:(COACH[sy]&&COACH[sy][tid]&&COACH[sy][tid].n)||null};}
+      STY[sy]=o;}
+  }catch(e){console.error('球隊風格失敗:',e.message);}
+
   /* ---------- 5.6) 由「賽前真實傷兵名單」學傷兵係數:比 box score 推缺陣更準(含出賽存疑),
        以前 60% 樣本學、後 40% 驗證,誤差有降才採用;樣本不足前沿用缺陣殘差法 ---------- */
   let injPG=null;
@@ -558,15 +609,21 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const health={withPb:LED.filter(e=>e.pb).length,withOf:LED.filter(e=>e.of).length,withOd:LED.filter(e=>e.od).length,withBx:LED.filter(e=>e.bx).length,withPg:LED.filter(e=>e.pg).length,withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
     fixed,added,errors,fitN:samples.length,pdb:pdbN,seasonsN:seasons.length,seasons,secs:Math.round((Date.now()-t0)/1000)};
   const fit={variant,prm:PRMF,K:KF,coef:coefF,trainN:finalTrain.length,win:WIN,bt,tot,hcaBySeason,phEval};
-  const calib={k:K,sigma:S,injF:inj.f,inj,injPG,prm:PRMF,mb:MBT,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
+  const calib={k:K,sigma:S,injF:inj.f,inj,injPG,prm:PRMF,mb:MBT,styles:STY,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
     last:LED.length?LED[LED.length-1].d:null,updated:new Date().toISOString(),window:FIT_DAYS,health};
   fs.writeFileSync(F_CALIB,JSON.stringify(calib));
   for(const sy of Object.keys(bySy)){
     const f=path.join(D_SEED,`ledger-${sy}.json`);const txt=JSON.stringify(bySy[sy]);
     if(!fs.existsSync(f)||fs.readFileSync(f,'utf8')!==txt)fs.writeFileSync(f,txt);
   }
-  for(const f of Object.keys(PBP_DAYS)){const dir=path.dirname(f);if(!fs.existsSync(dir))fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(f,JSON.stringify(PBP_DAYS[f]));}
-  if(Object.keys(PBP_DAYS).length)console.log(`逐球紀錄寫入 ${Object.keys(PBP_DAYS).length} 個日期檔`);
+  for(const f of Object.keys(PBP_DAYS)){const dir=path.dirname(f);if(!fs.existsSync(dir))fs.mkdirSync(dir,{recursive:true});
+    fs.writeFileSync(f,zlib.gzipSync(Buffer.from(JSON.stringify(PBP_DAYS[f]),'utf8'),{level:9}));
+    const old=f.replace(/\.gz$/,'');if(fs.existsSync(old))fs.unlinkSync(old);}
+  if(Object.keys(PBP_DAYS).length)console.log(`逐球紀錄寫入 ${Object.keys(PBP_DAYS).length} 個日期檔(gzip)`);
+  /* 舊的未壓縮逐球檔一次轉成 gzip */
+  for(const dir of fs.readdirSync(D_SEED).filter(x=>/^pbp-\d{4}$/.test(x))){const dp=path.join(D_SEED,dir);
+    for(const fn of fs.readdirSync(dp).filter(x=>/\.json$/.test(x))){const f=path.join(dp,fn);
+      if(!fs.existsSync(f+'.gz'))fs.writeFileSync(f+'.gz',zlib.gzipSync(fs.readFileSync(f),{level:9}));fs.unlinkSync(f);}}
   fs.writeFileSync(F_META,JSON.stringify(meta));
   if(fs.existsSync(F_SEED_OLD))fs.unlinkSync(F_SEED_OLD);
   console.log('完成:',JSON.stringify({k:K,sigma:S,injF:inj.f,hit:hit!=null?+(hit*100).toFixed(1):null,...health,seasons:undefined}));
