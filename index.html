@@ -127,11 +127,11 @@
   .teams{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 220px}
   .team{display:flex;align-items:center;gap:8px}
   .team .rec{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
-  .rhe-head{display:grid;grid-template-columns:1fr repeat(3,34px);gap:0 6px;
+  .rhe-head{display:grid;grid-template-columns:1fr repeat(var(--n,4),26px) 36px;gap:0 6px;
     font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:right;margin-bottom:2px}
-  .team.rhe{display:grid;grid-template-columns:1fr repeat(3,34px);gap:0 6px;align-items:center}
+  .team.rhe{display:grid;grid-template-columns:1fr repeat(var(--n,4),26px) 36px;gap:0 6px;align-items:center}
   .team.rhe .nmwrap{display:flex;align-items:center;gap:8px;min-width:0}
-  .team.rhe .nmwrap .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .team.rhe .nmwrap .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:48px}
   .team.rhe .cell{font-family:var(--mono);font-weight:600;font-size:16px;text-align:right;color:var(--muted)}
   .team.rhe .cell.r{font-size:18px}
   .team.rhe.win .cell.r{color:var(--amber)}
@@ -329,7 +329,8 @@
     .game{padding:12px 12px}
     .nm-full{display:none} .nm-short{display:inline}
     .team .rec{white-space:nowrap}
-    .rhe-head,.team.rhe{gap:0 4px}
+    .rhe-head,.team.rhe{gap:0 3px;grid-template-columns:1fr repeat(var(--n,4),23px) 34px}
+    .team.rhe .rec{display:none} .team.rhe .cell{font-size:14px} .team.rhe .cell.r{font-size:17px} .team.rhe .nmwrap{gap:6px}
     .why,.review{font-size:13px} .mb .mbt{font-size:13px}
     .headline{font-size:13.5px;padding:10px 12px}
     .analysis{font-size:14px}
@@ -442,7 +443,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.4 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.4.1 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -1129,17 +1130,17 @@ function ballSvg(){
 }
 function lineTable(g,isFinal){
   const n=Math.max(g.aLines?.length||0,g.hLines?.length||0,4);
-  const cols=`1fr repeat(${n},26px) 36px`;
+  const cols=`--n:${n}`;
   const heads=Array.from({length:n},(_,i)=>`<span>${i<4?'Q'+(i+1):'OT'+(i-3>1?i-3:'')}</span>`).join('');
   const cells=arr=>Array.from({length:n},(_,i)=>`<span class="cell he">${arr&&arr[i]!=null?arr[i]:''}</span>`).join('');
   const homeWin=isFinal&&(g.homeScore??0)>(g.awayScore??0);
   const recA=g.awayRec?`<span class="rec">${g.awayRec}</span>`:'';
   const recH=g.homeRec?`<span class="rec">${g.homeRec}</span>`:'';
   return `<div class="teams">
-    <div class="rhe-head" style="grid-template-columns:${cols}"><span></span>${heads}<span>T</span></div>
-    <div class="team rhe ${isFinal&&!homeWin?'win':''}" style="grid-template-columns:${cols}"><span class="nmwrap">${teamLink(g.awayId,g.away,g.awayAbbr)}${recA}</span>
+    <div class="rhe-head" style="${cols}"><span></span>${heads}<span>T</span></div>
+    <div class="team rhe ${isFinal&&!homeWin?'win':''}" style="${cols}"><span class="nmwrap">${teamLink(g.awayId,g.away,g.awayAbbr)}${recA}</span>
       ${cells(g.aLines)}<span class="cell r">${g.awayScore??''}</span></div>
-    <div class="team rhe ${isFinal&&homeWin?'win':''}" style="grid-template-columns:${cols}"><span class="nmwrap">${teamLink(g.homeId,g.home,g.homeAbbr)}${recH}</span>
+    <div class="team rhe ${isFinal&&homeWin?'win':''}" style="${cols}"><span class="nmwrap">${teamLink(g.homeId,g.home,g.homeAbbr)}${recH}</span>
       ${cells(g.hLines)}<span class="cell r">${g.homeScore??''}</span></div>
   </div>`;
 }
@@ -1903,7 +1904,7 @@ function renderFooter(){
     `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.4 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.4.1 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
