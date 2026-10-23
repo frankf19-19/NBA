@@ -146,7 +146,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     if(r.bx)e.bx=r.bx;else e.bxx=1;
     for(const k of ['tst','ls','hs','as','ven','att','tip','of','od','ss'])if(r[k]!=null)e[k]=r[k];
     if(r.gi&&(Date.parse(today)-Date.parse(e.d))/864e5<=GI_MAX_AGE){e.gi=r.gi;e.giT=today;}
-    if(r.pbp&&r.pbp.plays&&r.pbp.plays.length&&e.sy>=seasonNow0-PBP_BACK_SEASONS)pbpStore(e,r.pbp);
+    if(e.sy>=seasonNow0-PBP_BACK_SEASONS){if(r.pbp&&r.pbp.plays&&r.pbp.plays.length)pbpStore(e,r.pbp);else e.pbx=1;}
     e.px=2;};   /* px = 完整過程擷取版本 */
   const fetchBox=async(label,list)=>{
     const todo=list||LED.filter(e=>(!e.pl||!e.ts)&&!e.tsx);
@@ -163,7 +163,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   };
   await fetchBox('box score(掃描前)');
   /* 歷史場次補齊完整原始資料:每次最多 BX_PER_RUN 場,由新到舊,幾週內自動補完 1994-95 季起全部 */
-  {const need=e=>!(e.px>=2)&&!e.bxx;
+  {const need=e=>!e.bxx&&(!(e.px>=2)||(e.sy>=seasonNow0-PBP_BACK_SEASONS&&!e.pb&&!e.pbx));
     const bk=LED.filter(need).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,BX_PER_RUN);
     if(bk.length)await fetchBox(`完整原始資料回補(剩 ${LED.filter(need).length} 場)`,bk);}
 
