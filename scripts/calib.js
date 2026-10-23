@@ -522,6 +522,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     console.log(`官方裁判派遣:${REFTODAY.length} 場`);
   }catch(e){dlog('裁判派遣失敗:'+e.message);}
   /* NBA 官方傷兵報告 PDF(每天多版):取最新一份,存原文與解析後的列(球隊/球員/狀態/原因) */
+  let INJOFF=[];
   try{const idx=await (await fetch(`https://official.nba.com/nba-injury-report-${seasonNow-1}-${String(seasonNow).slice(2)}-season/`,{headers:{'User-Agent':'Mozilla/5.0 (nba-scoreboard)'},signal:AbortSignal.timeout(20000)})).text();
     /* 連結格式 Injury-Report_YYYY-MM-DD_HH_MM(AM|PM).pdf,每 15 分鐘一版;頁面會列出整天的時段,實際存在的才抓得到,由最新往前試 */
     const links=[...new Set([...idx.matchAll(/href="([^"]*Injury-Report_(\d{4}-\d\d-\d\d)_(\d\d)_(\d\d)([AP]M)\.pdf)"/gi)].map(m=>JSON.stringify({u:m[1],d:m[2],h:(+m[3]%12)+(m[5].toUpperCase()==='PM'?12:0),mi:+m[4]})))].map(x=>JSON.parse(x))
@@ -532,13 +533,18 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     if(L0){const key=`${L0.d}_${String(L0.h).padStart(2,'0')}${String(L0.mi).padStart(2,'0')}`;
       if(!Object.values(DAILY.injpdf).some(x=>x.key===key)){
         let text='';try{const pdfParse=require('pdf-parse');text=(await pdfParse(buf)).text||'';}catch(e){console.error('pdf-parse 不可用:',e.message);}
-        const rows=[];let game='',team='';
-        for(const raw of text.split(/\n/)){const ln=raw.replace(/\s+/g,' ').trim();if(!ln)continue;
-          const gm=/([A-Z]{3})@([A-Z]{3})/.exec(ln);if(gm)game=gm[0];
-          const m=/^(.*?)(Out|Doubtful|Questionable|Probable|Available)\s*(.*)$/.exec(ln);
-          if(m){const left=m[1].trim();const tm=/^([A-Z][A-Za-z.' ]+?(?:ers|cs|ks|ls|ns|rs|ts|zz|s|z|ic|at)) /.exec(left);
-            const pm=/([A-Z][A-Za-z.'-]+, [A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.]+)?)\s*$/.exec(left);
-            rows.push({g:game,t:left.replace(pm?pm[1]:'','').trim().slice(0,40),p:pm?pm[1]:left.slice(-40),s:m[2],r:m[3].slice(0,80)});}}
+        /* pdf-parse 會把空白吃掉:每列形如 [日期][時間(ET)][AAA@BBB][球隊名]姓,名[,Jr.]狀態[原因],原因可能延到下一行 */
+        const rows=[];let gd='',gt='',game='',team='';
+        for(const raw of text.split(/\n/)){const ln=raw.replace(/\s+/g,'').trim();if(!ln||/^InjuryReport:|^Page\d|^GameDate/.test(ln))continue;
+          const m=/^(?:(\d\d\/\d\d\/\d{4}))?(?:(\d\d:\d\d)\(ET\))?(?:([A-Z]{3}@[A-Z]{3}))?(.*?)(Out|Doubtful|Questionable|Probable|Available)(.*)$/.exec(ln);
+          if(m){if(m[1])gd=m[1];if(m[2])gt=m[2];if(m[3])game=m[3];
+            const mid=m[4]||'';const pm=/([A-Z][A-Za-z.'\-]*(?:,[A-Z][A-Za-z.'\-]*)+)$/.exec(mid);
+            const pl=pm?pm[1]:mid;const tm=mid.slice(0,mid.length-pl.length);if(tm)team=tm;
+            const parts=pl.split(',');const first=parts[parts.length-1],last=parts[0],suf=parts.length>2?parts.slice(1,-1).join(' '):'';
+            rows.push({d:gd,tm:gt,g:game,team,p:`${first} ${last}${suf?' '+suf:''}`.trim(),s:m[5],r:m[6]||''});}
+          else if(rows.length)rows[rows.length-1].r+=ln;}
+        rows.forEach(x=>{x.r=x.r.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/-/g,' - ').replace(/\s+/g,' ').slice(0,80);});
+        INJOFF=rows;
         DAILY.injpdf[today]={key,url:L0.u,n:rows.length,rows,raw:text.slice(0,60000)};
         dlog(`官方傷兵報告:${key},解析 ${rows.length} 列,原文 ${text.length} 字`);}else dlog('官方傷兵報告:最新版已存過 '+key);}else dlog('官方傷兵報告:沒有抓到可用的 PDF');
   }catch(e){dlog('官方傷兵報告失敗:'+e.message);}
@@ -578,6 +584,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       const pm={};await Promise.all(ids.map(async(id,i)=>{pm[id]=await W.statsWithPrior(id,season,asOf,d,seas[i]);}));
       const lg=W.leagueRPG(pm);const EF=W.effTable(d,season);
       W.__inj=await W.loadInjuries(ids);E('INJ=window.__inj;INJ_READY=true');
+      if(INJOFF.length&&d===today){W.__injOff=INJOFF;const nOff=E('applyOfficialInjuries(window.__injOff)');dlog(`官方傷兵報告套用 ${nOff} 筆(含 Doubtful/Questionable/Probable 分級)`);}
       setCur(d);
       for(const g of live){
         let hw=0,aw=0;(seas[ids.indexOf(g.homeId)]||[]).forEach(r=>{if(r.done&&r.oppId===g.awayId&&r.pf!=null&&r.date<d){if(r.won)hw++;else aw++;}});

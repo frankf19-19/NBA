@@ -447,7 +447,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.7 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.8 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -939,16 +939,32 @@ async function loadInjuries(teamIds){
   await Promise.allSettled(jobs);
   return map;
 }
+/* 狀態 → 缺陣機率權重:Out 1、Doubtful 0.75、Questionable/Day-To-Day 0.4、Probable 0.1(官方報告分級;ESPN 只有 Out/Day-To-Day) */
+function injWeight(st){st=String(st||'');if(/out/i.test(st))return 1;if(/doubt/i.test(st))return 0.75;if(/question|day/i.test(st))return 0.4;if(/probable/i.test(st))return 0.1;return 0;}
 function injInfo(teamId){
   const list=(INJ[teamId]||[]).filter(x=>(x.pts||0)>=6);
   let adj=0;const names=[];
   list.forEach(x=>{
-    const out=/out/i.test(x.status);
-    const f=out?INJ_F:(/day|question|doubt/i.test(x.status)?INJ_F*0.35:0);
-    if(!f)return;
-    adj-=x.pts*f;names.push(`${x.name}(場均 ${x.pts} 分,${out?'確定缺陣':'出賽存疑'})`);
+    const w=injWeight(x.status);if(!w)return;
+    adj-=x.pts*INJ_F*w;names.push(`${x.name}(場均 ${x.pts} 分,${w>=1?'確定缺陣':w>=0.7?'出賽機率低':w>=0.3?'出賽存疑':'大概會上'})`);
   });
   return {adj:+Math.max(-4.5,adj).toFixed(1),names:names.slice(0,3)};
+}
+/* NBA 官方傷兵報告(雲端每天解析 PDF 後注入):以官方狀態覆寫/補上 ESPN 名單;球隊以去空白全名比對,球員以姓名比對球員資料庫 */
+const nameKey=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
+function applyOfficialInjuries(rows){
+  if(!Array.isArray(rows)||!rows.length)return 0;
+  const tidByName={};Object.values(PDB.teams||{}).forEach(t=>{tidByName[nameKey(t.n)]=t.id;});
+  const pidByName={};Object.values(PDB.players||{}).forEach(p=>{pidByName[nameKey(p.n)]=p;});
+  let n=0;
+  rows.forEach(r=>{const tid=tidByName[nameKey(r.team)];if(!tid)return;
+    const k=nameKey(r.p);let p=pidByName[k];
+    if(!p){const parts=r.p.split(' ');const alt=nameKey(parts[0]+parts[parts.length-1]);p=Object.values(PDB.players).find(x=>x.tid===tid&&(nameKey(x.n)===alt||nameKey(x.n).startsWith(alt)));}
+    const list=INJ[tid]=INJ[tid]||[];
+    const ex=list.find(x=>(p&&x.id===p.id)||nameKey(x.name)===k);
+    if(ex){ex.status=r.s;ex.off=1;}else list.push({id:p?+p.id:0,name:p?p.n:r.p,status:r.s,pts:p&&p.pts!=null?p.pts:0,off:1});
+    n++;});
+  return n;
 }
 
 /* 逐隊偏差修正:從預測紀錄簿(真實賽果)回看模型近期對該隊的系統性高低估,含阻尼與上限。
@@ -1997,7 +2013,7 @@ function renderFooter(){
     `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.7 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.8 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
