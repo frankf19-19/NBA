@@ -1,6 +1,7 @@
 name: 資料源探測(手動)
 on: { workflow_dispatch: {} }
-permissions: { contents: read }
+permissions: { contents: write }
+concurrency: { group: nba-calib, cancel-in-progress: false }
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -9,4 +10,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with: { node-version: 24 }
-      - run: node scripts/probe.js
+      - run: node scripts/probe.js | tee probe-result.txt
+      - run: |
+          git config user.name "calib-bot"; git config user.email "actions@users.noreply.github.com"
+          git add probe-result.txt; git diff --cached --quiet && exit 0
+          git commit -m "資料源探測結果 $(date -u +%FT%H:%M)"; git pull --rebase origin main; git push
