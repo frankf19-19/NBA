@@ -404,7 +404,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.1 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v2.2 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -669,6 +669,29 @@ function parsePlayerLines(d){
   if(gi.venue&&gi.venue.fullName)out.ven=gi.venue.fullName;
   if(isFinite(+gi.attendance)&&+gi.attendance>0)out.att=+gi.attendance;
   if(hc.date)out.tip=hc.date;
+  /* 裁判、賽前盤口(DraftKings 等:讓分/大小分/獨贏,開盤與收盤)、該場賽前傷兵名單、本季系列戰 */
+  const offs=(gi.officials||[]).map(o=>o.fullName||o.displayName).filter(Boolean);if(offs.length)out.of=offs;
+  const pc=(d.pickcenter||[])[0];
+  if(pc){const ln=x=>x==null?null:(isFinite(+x)?+x:(parseFloat(String(x).replace(/[^\d.+-]/g,''))||null));
+    out.od={pv:pc.provider?.name||'',sp:ln(pc.spread),ou:ln(pc.overUnder),dt:pc.details||'',
+      spH:[ln(pc.pointSpread?.home?.open?.line),ln(pc.pointSpread?.home?.close?.line)],
+      ouL:[ln(pc.total?.over?.open?.line),ln(pc.total?.over?.close?.line)],
+      ml:[ln(pc.homeTeamOdds?.moneyLine),ln(pc.awayTeamOdds?.moneyLine)],
+      mlO:[ln(pc.moneyline?.home?.open?.odds),ln(pc.moneyline?.away?.open?.odds)]};}
+  const gi2=[];(d.injuries||[]).forEach(t=>{const tid=+(t.team?.id||0);(t.injuries||[]).forEach(x=>{const pid=injAthleteId(x.athlete);if(pid)gi2.push([tid,pid,x.type?.abbreviation||x.status||'']);});});
+  if(gi2.length)out.gi=gi2;
+  const ss=(d.seasonseries||[])[0];if(ss&&ss.summary)out.ss=ss.summary;
+  /* 完整比賽過程:逐球紀錄(序號、節、剩餘秒、事件類型、球隊、球員、比分、得分、出手、落點、實際時刻)、事件類型對照、ESPN 逐球勝率曲線、原文 */
+  if(Array.isArray(d.plays)&&d.plays.length){
+    const clk=c=>{const m=/(\d+):(\d+)(?:\.(\d))?/.exec(c||'');return m?(+m[1]*60+ +m[2]+(m[3]?+m[3]/10:0)):null;};
+    const types={};
+    const plays=d.plays.map(p=>{const t=+(p.type&&p.type.id)||0;if(t&&p.type.text)types[t]=p.type.text;
+      return [+p.sequenceNumber||0,p.period?.number||0,clk(p.clock?.displayValue),t,+(p.team?.id)||0,(p.participants||[]).map(x=>+(x.athlete?.id)||0),
+        p.awayScore??null,p.homeScore??null,p.scoringPlay?1:0,p.scoreValue||0,p.shootingPlay?1:0,p.coordinate?+p.coordinate.x:null,p.coordinate?+p.coordinate.y:null,
+        p.wallclock?Math.round(Date.parse(p.wallclock)/1000):null];});
+    out.pbp={cols:['seq','period','secLeft','typeId','teamId','athletes','awayScore','homeScore','scoring','scoreValue','shot','x','y','wallclock'],
+      plays,types,txt:d.plays.map(p=>p.text||''),wp:(d.winprobability||[]).map(w=>+(+w.homeWinPercentage).toFixed(3))};
+  }
   return out;
 }
 async function capturePlayerLines(maxN,since){
@@ -1583,6 +1606,13 @@ async function loadGame(gid){
     const box=d.boxscore||{};
     const boxes=(box.players||[]).map(boxTable).join('');
     const cmp=teamCompare(box);
+    /* 裁判與賽前盤口(ESPN 提供,僅供參考) */
+    const offs=((d.gameInfo||{}).officials||[]).map(o=>o.fullName||o.displayName).filter(Boolean);
+    const pc=(d.pickcenter||[])[0];
+    const infoBits=[];
+    if(offs.length)infoBits.push(`裁判:${offs.join('、')}`);
+    if(pc&&(pc.details||pc.overUnder!=null))infoBits.push(`賽前盤口(${esc(pc.provider?.name||'')}):讓分 ${esc(pc.details||'-')}${pc.overUnder!=null?` · 大小分 ${pc.overUnder}`:''}${pc.homeTeamOdds?.moneyLine!=null?` · 獨贏 主 ${pc.homeTeamOdds.moneyLine>0?'+':''}${pc.homeTeamOdds.moneyLine} / 客 ${pc.awayTeamOdds?.moneyLine>0?'+':''}${pc.awayTeamOdds?.moneyLine}`:''}`);
+    const infoHtml=infoBits.length?`<div class="meta" style="margin-top:10px">${infoBits.map(esc).join(' · ')}</div>`:'';
     $('gdTag').textContent=st==='Live'?'每 20 秒自動更新':'';
     $('gameDetail').innerHTML=`
       <div class="gd-score">
@@ -1595,6 +1625,7 @@ async function loadGame(gid){
           <div class="grec">${esc(recOf(home))}</div></div>
       </div>
       ${lineTbl}
+      ${infoHtml}
       ${liveWpTxt}
       ${duel}${zone}${cmp}${boxes}`;
     bindPlayerClicks($('gameDetail'));
@@ -1783,10 +1814,10 @@ function renderFooter(){
     `K=${MARGIN_K.toFixed(2)}、σ=${RUN_SIGMA.toFixed(2)} 由近 2,500 場例行賽每日重新擬合`,
     `開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿`,
     `勝分差區間(贏 1–5/6–10/11–15/16–20/21–25/26+):機率${MB&&MB.use==='emp'?'由近四季實戰「預測分差 → 實際落點」統計表給出':'以常態分布估計'},每日與另一法滾動回測比較後自動選用;勝方與區間都對才算全中`,
-    `自有資料庫:每場完整 box score、各節比分與球隊統計,每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
+    `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.1 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v2.2 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
