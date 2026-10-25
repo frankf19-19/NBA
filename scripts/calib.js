@@ -19,7 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const {JSDOM,VirtualConsole}=require('jsdom');
-/* 版本:v2.7(ESPN BPI 回補與三來源混合、官方裁判派遣、官方傷兵報告 PDF、球員異動、球隊進階統計快照)v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
+/* 版本:v3.0(傷兵改以最終分數加在 K 與季內乘數之後,上限 −7)v2.7(ESPN BPI 回補與三來源混合、官方裁判派遣、官方傷兵報告 PDF、球員異動、球隊進階統計快照)v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
@@ -224,7 +224,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           if(x.hs!=null){e.hs=x.hs;e.as=x.as;}
-          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at};   /* 賽前(含當日傷兵)預測,凍結 */
+          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1};   /* 賽前(含當日傷兵)預測,凍結 */
           return e;});
         if(fresh.length){fresh.forEach(e=>{have.add(e.id);haveKey.add(e.d+'|'+e.hid+'|'+e.aid);insertSorted(LED,e);byId.set(e.id,e);});added+=fresh.length;sAdd+=fresh.length;}
         return true;
@@ -605,12 +605,12 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),mm:+p.raw_margin.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
           hn:ih.names,an:ia.names,p:+p.home_prob.toFixed(3),mb:p.mb,mbp:+(+p.mbp).toFixed(3),mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
           bpi:(bp&&!bp.x)?bp.pd:null,bpiP:(bp&&!bp.x)?bp.hp:null,
-          k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString()};preN++;
+          k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString(),u:2};preN++;
       }
       E('INJ_READY=false');
     }
     /* 已入紀錄簿但當時沒附賽前預測的,補附 */
-    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at};}}
+    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1};}}
     fs.writeFileSync(F_PRE,JSON.stringify(PRE));
   }catch(e){console.error('賽前預測失敗:',e.message);}
   fs.writeFileSync(F_DAILY,JSON.stringify(DAILY));   /* 賽前段落的執行記錄也要存 */
@@ -666,15 +666,15 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   let injPG=null;
   {
     const K=+E('MARGIN_K');
-    const rows=LED.filter(e=>e.pg&&e.mp!=null&&!e.po&&!e.nu&&!e.nm&&e.pg.f>0&&(e.pg.ih||e.pg.ia))
-      .map(e=>{const ph=phM(e);return {x:K*ph*(e.pg.ih-e.pg.ia)/e.pg.f,y:e.am-K*ph*e.mp};});
+    const rows=LED.filter(e=>e.pg&&e.pg.u===2&&e.mp!=null&&!e.po&&!e.nu&&!e.nm&&e.pg.f>0&&(e.pg.ih||e.pg.ia))
+      .map(e=>{const ph=phM(e);return {x:(e.pg.ih-e.pg.ia)/e.pg.f,y:e.am-K*ph*e.mp};});   /* ih/ia 已是最終分數單位(v3.0 起,u=2) */
     if(rows.length>=150){
       const fit=rs=>{let xy=0,xx=0;rs.forEach(r=>{xy+=r.x*r.y;xx+=r.x*r.x;});return xx>0?xy/xx:0;};
       const cut=Math.floor(rows.length*0.6),tr=rows.slice(0,cut),te=rows.slice(cut);
-      const fT=Math.max(0.02,Math.min(0.6,fit(tr)));
+      const fT=Math.max(0.02,Math.min(0.3,fit(tr)));
       const mae=(rs,f)=>rs.reduce((a,r)=>a+Math.abs(r.y-f*r.x),0)/rs.length;
-      const m0=mae(te,inj.f),m1=mae(te,fT);
-      injPG={n:rows.length,f:+Math.max(0.02,Math.min(0.6,fit(rows))).toFixed(2),fTrain:+fT.toFixed(2),before:+m0.toFixed(3),after:+m1.toFixed(3),adopt:m1<m0-0.005};
+      const m0=mae(te,inj.f),m1=mae(te,fT);   /* inj.f 與 fT 同為最終分數單位 */
+      injPG={n:rows.length,f:+Math.max(0.02,Math.min(0.3,fit(rows))).toFixed(3),fTrain:+fT.toFixed(2),before:+m0.toFixed(3),after:+m1.toFixed(3),adopt:m1<m0-0.005};
       if(injPG.adopt){inj.f=injPG.f;inj.src='pregame';inj.nPG=rows.length;}
       console.log('賽前傷兵係數學習:',JSON.stringify(injPG));
     }else console.log(`賽前傷兵係數學習:樣本 ${rows.length} 場,滿 150 場後啟用`);
