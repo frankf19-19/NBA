@@ -120,7 +120,9 @@ function build(entries,{cutoff,season}={}){
  for(let sy=season-2;sy<season;sy++){
   const tr=folds.filter(r=>r.sy>=sy-3&&r.sy<sy),te=folds.filter(r=>r.sy===sy);if(tr.length<2000||te.length<300)continue;
   const residuals=tr.map(r=>r.y-r.base),lo=quantile(residuals,.1),hi=quantile(residuals,.9);
-  validation.push({season:sy,referenceCoverage:te.filter(r=>r.y>=r.base+lo&&r.y<=r.base+hi).length/te.length,baseline:metrics(te,te.map(r=>home(distribution(tr,Math.abs(r.base),'window'),r.base))),kernel:metrics(te,te.map(r=>home(distribution(tr,Math.abs(r.base)),r.base)))});
+  const foldGrid=Array.from({length:161},(_,i)=>distribution(tr,i*.25));
+  for(let k=0;k<6;k++)foldGrid[0][k]=foldGrid[0][k+6]=(foldGrid[0][k]+foldGrid[0][k+6])/2;
+  validation.push({season:sy,referenceCoverage:te.filter(r=>r.y>=r.base+lo&&r.y<=r.base+hi).length/te.length,baseline:metrics(te,te.map(r=>home(distribution(tr,Math.min(30,Math.round(Math.abs(r.base)/.5)*.5),'window'),r.base))),kernel:metrics(te,te.map(r=>gridProbability(foldGrid,.25,r.base)))});
  }
  const through=data[data.length-1].d;
  const enabled=validation.length>=2&&validation.every(v=>v.kernel.logloss<v.baseline.logloss)&&validation.reduce((s,v)=>s+(v.kernel.full-v.baseline.full)*v.kernel.n,0)>=0;
@@ -129,11 +131,14 @@ function build(entries,{cutoff,season}={}){
   challenger:{coeff,state:f.state,enabled:false,trainN:train.length},validation,prospective:prospective(entries)};
 }
 function valid(model,date){return !!(model&&model.schema===1&&model.enabled&&model.grid&&model.trainedThrough&&date>model.trainedThrough&&dayDiff(model.trainedThrough,date)<=4&&seasonOf(date)===model.season);}
-function probabilities(model,margin,date){
- if(!valid(model,date)||!finite(margin))return null;const g=model.grid.probabilities,step=model.grid.step;if(!Array.isArray(g)||g.length<2||!(step>0))return null;
+function gridProbability(g,step,margin){
+ if(!finite(margin)||!Array.isArray(g)||g.length<2||!(step>0))return null;
  const x=Math.min(g.length-1,Math.abs(margin)/step),lo=Math.floor(x),hi=Math.min(g.length-1,lo+1),a=x-lo;
  if(!Array.isArray(g[lo])||g[lo].length!==12||!Array.isArray(g[hi])||g[hi].length!==12)return null;
  const p=normalize(g[lo].map((v,i)=>v*(1-a)+g[hi][i]*a));return p?home(p,margin):null;
+}
+function probabilities(model,margin,date){
+ if(!valid(model,date))return null;return gridProbability(model.grid.probabilities,model.grid.step,margin);
 }
 function forecast(model,g,f,date){
  if(!valid(model,date)||!model.challenger||!f||!Array.isArray(f.x))return null;
