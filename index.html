@@ -457,9 +457,10 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.0.2 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.1.0 · 資料來源:ESPN 公開 API</footer>
 </div>
 
+<script src="scripts/margin-model.js?v=1"></script>
 <script>
 // 儲存空間不可用時，仍允許瀏覽與切換主題。
 const memoryStorage=new Map();
@@ -568,14 +569,14 @@ async function fetchGames(date){
       stype:(ev.season&&ev.season.type)||2,syear:(ev.season&&ev.season.year)||null,
       away:away.team?.displayName||'客隊',home:home.team?.displayName||'主隊',
       awayAbbr:away.team?.abbreviation||'',homeAbbr:home.team?.abbreviation||'',
-      awayId:+(away.team?.id||away.id||0),homeId:+(home.team?.id||home.id||0),
+      awayId:+(away.team?.id||away.id||0),homeId:+(home.team?.id||home.id||0),neutralSite:c.neutralSite===true,
       awayScore:sc(away),homeScore:sc(home),
       awayWin:away.winner===true,homeWin:home.winner===true,
       awayRec:rec(away),homeRec:rec(home),
       aLines:line(away),hLines:line(home),
       aLdr:leader(away),hLdr:leader(home),
       period:st.period,clock:st.displayClock,
-      startTpe:taipeiTime(ev.date||c.date),
+      startTpe:taipeiTime(ev.date||c.date),startISO:ev.date||c.date,
       lastPlay:c.situation?.lastPlay?.text||null,
       venue:c.venue?.fullName||null});
   });
@@ -804,6 +805,7 @@ async function capturePlayerLines(maxN,since){
    機率表 MB 由雲端用近四季實戰的「預測分差 → 實際落點」統計學得(常態分布會低估 6–10 與 26+ 的機率,實測全中率較差),
    每日以滾動回測與常態法比較後自動選用;沒有雲端表時退回常態分布。索引 0–5 = 主隊贏該區間、6–11 = 客隊贏該區間 */
 let MB=null;
+let MARGIN_MODEL=null;
 /* ---------- 市場盤口對照與裁判因子(都由雲端公平回測後決定是否啟用;PRM.mk / PRM.ref) ----------
    盤口:ESPN 單場 summary 的 pickcenter(DraftKings),主隊讓分線 → 市場預期主隊分差 = −讓分線;
    混合權重 w(模型)由歷史學得。裁判:每位裁判過往「主隊實際 − 模型預期」的收縮平均。 */
@@ -882,7 +884,8 @@ const MB_NAMES=['1–5','6–10','11–15','16–20','21–25','26+'];
 const MB_EDGES=[[0.5,5.5],[5.5,10.5],[10.5,15.5],[15.5,20.5],[20.5,25.5],[25.5,1e9]];
 function mbBucket(a){a=Math.abs(a);return a<=5?0:a<=10?1:a<=15?2:a<=20?3:a<=25?4:5;}
 function mbActualIdx(actM){return mbBucket(actM)+(actM>0?0:6);}
-function mbProbs(margin){
+function mbProbs(margin,date){
+  const joint=window.NBAMargin?.probabilities(MARGIN_MODEL,margin,date);if(joint)return joint;
   const useTab=MB&&MB.use==='emp'&&Array.isArray(MB.g)&&MB.g.length;
   let fav;  /* 以看好方角度:0–5 看好方贏該區間,6–11 看好方輸該區間 */
   if(useTab){
@@ -895,9 +898,9 @@ function mbProbs(margin){
   if(margin>=0)return fav;
   return fav.slice(6).concat(fav.slice(0,6));   /* 轉成主隊角度 */
 }
-function mbPick(margin){
-  const pr=mbProbs(margin);let i=0;for(let k=1;k<12;k++)if(pr[k]>pr[i])i=k;
-  return {i,p:pr[i],probs:pr,src:(MB&&MB.use==='emp')?'emp':'norm'};
+function mbPick(margin,date){
+  const pr=mbProbs(margin,date);let i=0;for(let k=1;k<12;k++)if(pr[k]>pr[i])i=k;
+  return {i,p:pr[i],probs:pr,src:window.NBAMargin?.valid(MARGIN_MODEL,date)?'kernel':((MB&&MB.use==='emp')?'emp':'norm')};
 }
 const mbLabel=(i,g)=>`${i<6?g.home:g.away} 贏 ${MB_NAMES[i%6]} 分`;
 let INJ_F=0.35;
@@ -1042,6 +1045,8 @@ function predict(g,pm,lg,date){
       why:`資料不足(球季初、季前賽或夏季聯賽),改以賽前可取得勝率(缺資料採 0.500；主 ${hPct.toFixed(3)} vs 客 ${aPct.toFixed(3)})加主場優勢估計。`};
   }
   const factors=[];
+  const distributionDate=(g.stype===1||g.stype===3||g.neutralSite)?null:date;
+  const gameHca=g.neutralSite?0:PRM.hca;
   const hRS=H.rs/H.gp,hRA=H.ra/H.gp,aRS=A.rs/A.gp,aRA=A.ra/A.gp;
   const offense=(sv,rec)=>isFinite(rec)?{v:0.65*sv+0.35*rec,usedRec:true}:{v:sv,usedRec:false};
   const defense=(sv,rec)=>isFinite(rec)?{v:0.7*sv+0.3*rec,usedRec:true}:{v:sv,usedRec:false};
@@ -1065,7 +1070,7 @@ function predict(g,pm,lg,date){
   }
   const useEff=PRM.eff&&effH!=null;
   if(useEff)factors.push('節奏與攻守效率');
-  let expHome=(useEff?effH:baseH)+PRM.hca,expAway=(useEff?effA:baseA);
+  let expHome=(useEff?effH:baseH)+gameHca,expAway=(useEff?effA:baseA);
   const P1=v=>(v>0?'+':'')+r1(v);
 
   // 休息日 + 4 天 3 戰疲勞(各項分數由 PRM 決定)
@@ -1173,23 +1178,28 @@ function predict(g,pm,lg,date){
   let refTxt='';const ra=refAdj(g._of);
   if(ra!=null&&Math.abs(ra)>=0.05){margin+=ra;refTxt=`裁判:${g._of.join('、')},過往執法時主隊相對模型平均 ${P1(ra)} 分(已收縮),已計入。`;factors.push('裁判');}
   const mid2=(expHome+expAway)/2;expHome=mid2+margin/2;expAway=mid2-margin/2;
-  const hp=Math.max(.05,Math.min(.95,normCdf(margin/sigUse)));
+  const joint=window.NBAMargin?.probabilities(MARGIN_MODEL,margin,distributionDate);
+  const hp=joint?joint.slice(0,6).reduce((a,b)=>a+b,0):Math.max(.05,Math.min(.95,normCdf(margin/sigUse)));
+  const shadowBase=window.NBAMargin?.forecast(MARGIN_MODEL,g,fvec,distributionDate);
+  const shadow=Number.isFinite(shadowBase)?shadowBase+(injH?.adj||0)-(injA?.adj||0):null;
+  const marginInterval=window.NBAMargin?.interval(MARGIN_MODEL,margin,distributionDate)||null;
   let hs=Math.round(expHome),as=Math.round(expAway);
   if(margin>=0&&hs<=as)hs=as+1;if(margin<0&&as<=hs)as=hs+1;
   const fav=margin>=0?g.home:g.away;
-  const mb=mbPick(margin);
+  const mb=mbPick(margin,distributionDate);
   let why=`主隊場均得 ${r1(hRS)} 失 ${r1(hRA)},客隊場均得 ${r1(aRS)} 失 ${r1(aRA)}(聯盟平均 ${r1(lg)})。`;
   const recBits=[];
   if(hOff.usedRec||hDef.usedRec)recBits.push(`主隊近10場 得${r1(H.rPFg)} 失${r1(H.rPAg)}`);
   if(aOff.usedRec||aDef.usedRec)recBits.push(`客隊近10場 得${r1(A.rPFg)} 失${r1(A.rPAg)}`);
   if(recBits.length){why+=`近況已納入:${recBits.join('、')}。`;factors.unshift('近10場走勢');}
   why+=priorTxt+(useEff?effTxt:'')+restTxt+moTxt+h2hTxt+injTxt+phTxt+biasTxt+mkTxt+refTxt;
-  why+=`含主場 ${PTS(PRM.hca)} 分${PRM.src==='cloud'?'(由歷年資料學得)':''},修正後得分期望 ${expAway.toFixed(1)}:${expHome.toFixed(1)}(客:主),預期 ${fav} 贏約 ${r1(Math.abs(margin))} 分。`;
+  why+=`含主場 ${PTS(gameHca)} 分${PRM.src==='cloud'?'(由歷年資料學得)':''},修正後得分期望 ${expAway.toFixed(1)}:${expHome.toFixed(1)}(客:主),預期 ${fav} 贏約 ${r1(Math.abs(margin))} 分。`;
   if(Math.abs(margin)<2)why+=`分差不到 2 分,實質接近五五波。`;
   return {home_prob:hp,away_prob:1-hp,predicted_winner:fav,home_score_pred:hs,away_score_pred:as,
     exp_home:+expHome.toFixed(1),exp_away:+expAway.toFixed(1),
     margin:Math.abs(margin),raw_margin:margin,raw_margin_pre:marginPre,why,factors,f:fvec,
     mb:mb.i,mbp:mb.p,mbProbs:mb.probs,mbSrc:mb.src,mk:Number.isFinite(g._mk)?g._mk:null,bpi:Number.isFinite(g._bpi)?g._bpi:null,model_margin:modelMargin,sigma:sigUse,
+    shadow,marginInterval,distributionVersion:joint?MARGIN_MODEL.version:null,
     injHit:!!(injTxt),restAdjusted:(rH!=null&&rA!=null),moAdjusted:(mH!=null&&mA!=null)};
 }
 /* 以紀錄簿凍結值覆寫顯示用預測:最終分差 mm、區間 mb、當時盤口 mk */
@@ -1197,14 +1207,17 @@ function applyFrozen(p,e,g){
   const m=+e.mm;if(!Number.isFinite(m))return;
   const P1=v=>(v>0?'+':'')+r1(v);
   p.raw_margin=m;p.margin=Math.abs(m);p.predicted_winner=m>=0?g.home:g.away;
-  p.home_prob=Math.max(.05,Math.min(.95,normCdf(m/(p.sigma||RUN_SIGMA))));p.away_prob=1-p.home_prob;
+  const snap=e.pg||e;
+  const q=Array.isArray(snap.q)&&snap.q.length===12&&snap.q.every(v=>Number.isFinite(v)&&v>=0)&&Math.abs(snap.q.reduce((a,b)=>a+b,0)-1)<.01?snap.q:null;
+  p.home_prob=Number.isFinite(snap.p)?snap.p:(q?q.slice(0,6).reduce((a,b)=>a+b,0):Math.max(.05,Math.min(.95,normCdf(m/(p.sigma||RUN_SIGMA)))));p.away_prob=1-p.home_prob;
   const mid=((p.exp_home??0)+(p.exp_away??0))/2;if(p.exp_home!=null){p.exp_home=+(mid+m/2).toFixed(1);p.exp_away=+(mid-m/2).toFixed(1);
     let hs=Math.round(p.exp_home),as=Math.round(p.exp_away);if(m>=0&&hs<=as)hs=as+1;if(m<0&&as<=hs)as=hs+1;p.home_score_pred=hs;p.away_score_pred=as;}
-  const mb=mbPick(m);p.mbProbs=mb.probs;p.mbSrc=mb.src;
-  if(e.mb!=null){p.mb=e.mb;p.mbp=e.mbp??mb.probs[e.mb];}else{p.mb=mb.i;p.mbp=mb.p;}
+  const mb=mbPick(m);p.mbProbs=q||mb.probs;p.mbSrc=q?'frozen':'reconstructed';
+  p.marginInterval=snap.interval||null;p.shadow=snap.shadow??null;
+  if(e.mb!=null){p.mb=e.mb;p.mbp=e.mbp??q?.[e.mb]??mb.probs[e.mb];}else{p.mb=mb.i;p.mbp=mb.p;}
   if(e.mk!=null){p.mk=e.mk;g._mk=e.mk;}
-  p.frozen=true;
-  p.why+=`〔以上為重算;實際採計的是開打前凍結的預測:主隊 ${P1(m)} 分${e.mk!=null?`、當時盤口 ${P1(e.mk)}`:''}〕`;
+  p.frozen=!!(snap.at&&(snap.tip||e.tip||g.startISO)&&Date.parse(snap.at)<Date.parse(snap.tip||e.tip||g.startISO));
+  p.why+=`〔以上理由為重算;實際採計的是${p.frozen?'開打前凍結的預測':'歷史紀錄值（未證實為賽前存證）'}:主隊 ${P1(m)} 分${e.mk!=null?`、當時盤口 ${P1(e.mk)}`:''}〕`;
 }
 function review(g,p){
   const actual=g.homeWin?g.home:(g.awayWin?g.away:(g.homeScore!=null&&g.awayScore!=null?(g.homeScore>g.awayScore?g.home:g.away):null));
@@ -1340,9 +1353,15 @@ function gameCard(g,p,rv){
     const pick=p.mb%6,pickFav=(p.mb<6)===favHome;
     const bars=favP.map((v,k)=>`<div class="mbb ${pickFav&&k===pick?'on':''}"><div class="mbn">${MB_NAMES[k]}</div><div class="mbr"><i style="width:${Math.max(3,Math.round(v/Math.max(...favP)*100))}%"></i></div><div class="mbv">${Math.round(v*100)}%</div></div>`).join('');
     const ai=rv&&rv.actMargin?mbActualIdx(rv.actMargin):null;
+    const ranked=pr.map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v).slice(0,3);
+    const alternatives=ranked.map(x=>`${esc(mbLabel(x.i,g))} ${Math.round(x.v*100)}%`).join(' · ');
+    const span=p.marginInterval;
+    const uncertainty=span?`<div class="mbfoot">依歷史中間 80% 誤差估計：主隊淨勝 ${span.lo.toFixed(0)} 至 ${span.hi.toFixed(0)} 分（負值代表客勝${Number.isFinite(span.observedCoverage)?`；保留期實際涵蓋 ${(span.observedCoverage*100).toFixed(1)}%`:""}；非保證區間）</div>`:'';
+    const source={kernel:'時間外回測平滑校準',emp:'近四季實戰統計',norm:'常態分布估計',frozen:'賽前封存機率',reconstructed:'事後重建機率，非賽前存證'}[p.mbSrc]||p.mbSrc;
     mbHtml=`<div class="mb"><div class="mbt"><span class="k">勝分差區間</span>預測 <b class="pick">${esc(mbLabel(p.mb,g))}</b>(全中機率 ${Math.round(p.mbp*100)}%)${rv&&rv.mbHit!=null?(rv.mbHit?' · <b style="color:var(--amber)">★ 全中</b>':` · 實際 ${esc(rv.actual)} 贏 ${Math.abs(rv.actMargin)} 分`):''}</div>
       <div class="mbrow">${bars}</div>
-      <div class="mbfoot">${esc(favName)} 各區間機率(${p.mbSrc==='emp'?'近四季實戰統計':'常態分布估計'});${esc(favHome?g.away:g.home)} 爆冷獲勝合計 ${Math.round(upset*100)}%${rv&&ai!=null&&!rv.mbHit?` · 實際落在「${esc((ai<6)===favHome?favName:(favHome?g.away:g.home))} 贏 ${MB_NAMES[ai%6]}」`:''}</div></div>`;
+      <div class="mbfoot">機率前三項：${alternatives}（合計 ${Math.round(ranked.reduce((a,b)=>a+b.v,0)*100)}%，不是單一預測命中率）</div>${uncertainty}
+      <div class="mbfoot">${esc(favName)} 各區間機率(${source});${esc(favHome?g.away:g.home)} 爆冷獲勝合計 ${Math.round(upset*100)}%${rv&&ai!=null&&!rv.mbHit?` · 實際落在「${esc((ai<6)===favHome?favName:(favHome?g.away:g.home))} 贏 ${MB_NAMES[ai%6]}」`:''}</div></div>`;
   }
   return `<div class="game ${isFinal?'done':''}">
     <div class="g-top">${teamsHtml}${pill}${gdayBtn}</div>
@@ -1459,7 +1478,12 @@ async function loadDay(quiet){
     }
     if(requestId!==dayRequestId||date!==$('datePick').value)return;
     /* 已完賽:若雲端紀錄簿有「開打前凍結」的預測,顯示與統計一律以凍結值為準(不用賽後資料重算) */
-    const FR={};if(date<etToday())ledger().forEach(e=>{if(e.d===date&&e.mm!=null)FR[e.id]=e;});
+    const FR={};if(date<=etToday())ledger().forEach(e=>{if(e.d===date&&e.mm!=null)FR[e.id]=e;});
+    if(!window.__CLOUD_BUILD&&games.some(g=>g.status==='Final'||g.status==='Live')){
+      const snapshots=await loadPregame(date);
+      if(requestId!==dayRequestId||date!==$('datePick').value)return;
+      games.filter(g=>g.status==='Final'||g.status==='Live').forEach(g=>{const pg=snapshots[g.id];if(pg&&pg.mm!=null)FR[g.id]={...pg,pg};});
+    }
     const seasById={};ids.forEach((id,i)=>seasById[id]=seas[i]||[]);
     games.forEach(g=>{let hw=0,aw=0;
       (seasById[g.homeId]||[]).forEach(r=>{if(r.done&&r.oppId===g.awayId&&r.pf!=null&&r.date<date){if(r.won)hw++;else aw++;}});
@@ -1467,7 +1491,7 @@ async function loadDay(quiet){
     // 排序:進行中 → 未開打 → 已完賽
     const wgt=g=>g.status==='Live'?0:(g.status==='Final'?2:1);
     games.sort((a,b)=>wgt(a)-wgt(b));
-    let hits=0,finals=0,errSum=0,errN=0,fulls=0,mbN=0,html='';
+    let hits=0,finals=0,errSum=0,errN=0,fulls=0,mbN=0,frozenFinals=0,html='';
     const reviews=[];curGames=games;curPreds=[];
     games.forEach(g=>{
       const A=pm[g.awayId],H=pm[g.homeId];
@@ -1476,19 +1500,19 @@ async function loadDay(quiet){
       if(H&&H.gp)g.homeRec=recOf(H);
       g._eff=EFF_DAY;
       const p=predict(g,pm,lg,date);
-      if(g.status==='Final'&&FR[g.id]&&p.raw_margin!=null)applyFrozen(p,FR[g.id],g);
+      if((g.status==='Final'||g.status==='Live')&&FR[g.id]&&p.raw_margin!=null)applyFrozen(p,FR[g.id],g);
       curPreds.push(p);
       const isSpecial=/postpon|suspend|cancel/i.test((g.detail||'')+(g.typeName||''));
       const isPre=g.stype===1;
       const rv=(g.status==='Final'&&!isSpecial)?review(g,p):null;
-      if(rv){rv.g=g;if(!isPre){finals++;if(rv.hit)hits++;
+      if(rv){rv.g=g;if(!isPre){finals++;if(p.frozen)frozenFinals++;if(rv.hit)hits++;
         if(rv.mbHit!=null){mbN++;if(rv.mbHit)fulls++;}
         if(p.raw_margin!=null){errSum+=Math.abs(rv.actMargin-p.raw_margin);errN++;}}}
       reviews.push(rv);html+=gameCard(g,p,rv);
     });
     $('games').innerHTML=html||`<div class="empty">${date} 沒有排定的比賽(可能為休賽季、全明星週或休兵日)。<br>NBA 例行賽約為每年 10 月下旬至隔年 4 月、季後賽至 6 月,可切換日期回顧過往賽事與預測回測。</div>`;
     $('listTitle').textContent=date+' 比賽';
-    $('listTag').textContent=games.length?games.length+' 場':'';
+    $('listTag').textContent=games.length?games.length+' 場'+(finals?` · 賽前存證 ${frozenFinals} / 歷史重建 ${finals-frozenFinals}`:''):'';
     $('dayPct').textContent=finals?((hits/finals*100).toFixed(1)+'%'):'—';
     $('dayRec').textContent=finals?(hits+' / '+finals):'0 / 0';
     $('dayErr').textContent=errN?(r1(errSum/errN)+' 分'):'—';
@@ -2041,6 +2065,7 @@ async function loadCloud(){
         if(c.styles)STY=c.styles;
         if(cloudFresh()){storage.setItem('nba_mk',String(MARGIN_K));storage.setItem('nba_sigma',String(RUN_SIGMA));}}}
   }catch(e){}
+  try{MARGIN_MODEL=await jget('margin-model.json?t='+Math.floor(Date.now()/600000));}catch(e){MARGIN_MODEL=null;}
   renderFooter();
   try{
     const r=await fetch('pdb.json?t='+Date.now(),{cache:'no-store'});
@@ -2069,11 +2094,11 @@ function renderFooter(){
     (PRM.ref&&PRM.ref.use)?'裁判因子:已啟用(逐季驗證有效)':'裁判因子:逐季驗證中,未啟用',
     `K=${MARGIN_K.toFixed(2)}、σ=${RUN_SIGMA.toFixed(2)} 由近 2,500 場例行賽每日重新擬合`,
     `開季機制:本季不足 15 場時以上季戰績打底、逐場自動淡出;熱身賽照常預測但不列入命中統計、校準與紀錄簿`,
-    `勝分差區間(贏 1–5/6–10/11–15/16–20/21–25/26+):機率${MB&&MB.use==='emp'?'由近四季實戰「預測分差 → 實際落點」統計表給出':'以常態分布估計'},每日與另一法滾動回測比較後自動選用;勝方與區間都對才算全中`,
+    `勝分差區間(贏 1–5/6–10/11–15/16–20/21–25/26+):機率${MARGIN_MODEL?.enabled?'由更早賽季的時間外預測平滑校準':(MB&&MB.use==='emp'?'由近四季實戰「預測分差 → 實際落點」統計表給出':'以常態分布估計')},每日與另一法滾動回測比較後自動選用;勝方與區間都對才算全中`,
     `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.0.2 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大，請以獨立期間的分差誤差與機率校準評估。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.1.0 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -2140,20 +2165,20 @@ function renderCalibHist(){
       <tr><td><b>合計</b></td><td><b>${F.tot.old.mae}</b></td><td><b>${F.tot.pts.mae}</b></td><td><b>${F.tot.eff.mae}</b></td><td><b>${F.tot.old.hit}% → ${F.tot[F.variant].hit}%</b></td></tr>
       </table></div>`;
     if(CLOUD.mb&&Array.isArray(CLOUD.mb.bt)&&CLOUD.mb.bt.length){const M=CLOUD.mb;
-      html+=`<div class="pos-group" style="margin-top:14px">勝分差區間(全中 = 勝方 + 區間都對):策略回測,目前採用 ${M.use==='emp'?'近四季實戰統計表':'常態分布'}</div>
+      html+=`<div class="pos-group" style="margin-top:14px">舊區間探索回測（目前參數重算，非獨立驗證），舊法採用 ${M.use==='emp'?'近四季實戰統計表':'常態分布'}</div>
         <div class="table-wrap"><table class="stat" style="min-width:420px">
         <tr><th>賽季</th><th>場數</th><th>常態分布 全中</th><th>實戰統計表 全中</th><th>表宣稱機率</th></tr>
         ${M.bt.slice().reverse().map(r=>`<tr><td>${lbl(r.s)}</td><td>${r.n}</td><td>${r.norm}%</td><td>${r.emp}%</td><td>${r.claimed}%</td></tr>`).join('')}
         <tr><td><b>合計</b></td><td></td><td><b>${M.tot.norm}%</b></td><td><b>${M.tot.emp}%</b></td><td></td></tr>
         </table></div>
-        <div class="tag" style="margin-top:4px">十二種結果(兩隊 × 六個區間)只選一種,歷年最好也就一成七左右;表由每日雲端重新統計,有比常態分布準才採用。實測:預期總分、球隊波動性都不能再提高全中率,看好方「贏 6–10」是最常見落點。</div>`;}
+        <div class="tag" style="margin-top:4px">十二種結果(兩隊 × 六個區間)只選一種,本頁目前的歷史結果約落在一至兩成，不能視為上限;表由每日雲端重新統計,有比常態分布準才採用。精確區間的不確定性高，請同時查看分差誤差與機率誤差；前三項合計不是單項命中率。</div>`;}
     if(Array.isArray(F.hcaBySeason)&&F.hcaBySeason.length)
       html+=`<div class="tag" style="margin-top:6px">歷年主場優勢(分):${F.hcaBySeason.map(x=>`${lbl(x.s)} ${(+x.v).toFixed(1)}`).join(' · ')}</div>`;
   }
   if(CLOUD&&CLOUD.health&&Array.isArray(CLOUD.health.seasons)&&CLOUD.health.seasons.length){
     const ssr=CLOUD.health.seasons.slice().reverse();
     const lbl=y=>`${y-1}-${String(y).slice(2)}`;
-    html+=`<div class="pos-group" style="margin-top:14px">歷年回測(雲端紀錄簿 ${ssr.length} 個賽季,例行賽,每場都以「當時之前」的資料預測)</div>
+    html+=`<div class="pos-group" style="margin-top:14px">歷年紀錄與重建（${ssr.length} 季；目前參數重算的數字不是獨立驗證）</div>
       <div class="table-wrap"><table class="stat" style="min-width:420px">
       <tr><th>賽季</th><th>場數</th><th>命中率(模型 / 最終)</th><th>全中率</th><th>分差誤差</th><th>季後賽</th><th>球員數據</th></tr>
       ${ssr.map(x=>`<tr><td>${lbl(x.s)}</td><td>${x.n}</td><td>${x.hit}%${x.hitF!=null?` / <b>${x.hitF}%</b>`:''}</td><td>${x.mb!=null?x.mb+'%':'-'}</td><td>${x.mae} 分</td><td>${x.po}</td><td>${x.pl}</td></tr>`).join('')}
@@ -2188,6 +2213,12 @@ function renderCalibHist(){
       <tr><th>日期</th><th>σ</th><th>K</th><th>樣本命中率</th><th>全中率</th><th>樣本(場)</th></tr>
       ${h.map(r=>`<tr><td>${esc(r.d)}</td><td>${r.s.toFixed(2)}</td><td>${r.k!=null?r.k.toFixed(2):'-'}</td><td>${r.hit}%</td><td>${r.mb!=null?r.mb+'%':'-'}</td><td>${r.n}</td></tr>`).join('')}
       </table></div>`;
+  }
+  if(MARGIN_MODEL){const V=MARGIN_MODEL.validation||[];
+    html+=`<div class="pos-group" style="margin-top:14px">勝分差校準：時間外驗證</div><div class="tag">資料截至 ${esc(MARGIN_MODEL.trainedThrough)}；新實力評分僅作賽前影子對照，尚未取代正式分差。</div>`;
+    if(V.length)html+=`<div class="table-wrap"><table class="stat"><tr><th>賽季</th><th>場數</th><th>原區間全中</th><th>新校準全中</th><th>機率誤差（越低越好）</th></tr>${V.map(r=>`<tr><td>${r.season-1}–${String(r.season).slice(2)}</td><td>${r.kernel.n}</td><td>${(r.baseline.full*100).toFixed(2)}%</td><td>${(r.kernel.full*100).toFixed(2)}%</td><td>${r.baseline.logloss.toFixed(3)} → ${r.kernel.logloss.toFixed(3)}</td></tr>`).join('')}</table></div>`;
+    html+='<div class="tag">每季只用更早賽季學參數，區間分布亦由當時尚未見過賽果的預測建立。小幅改善不保證未來維持。</div>';
+    const P=MARGIN_MODEL.prospective;if(P)html+=`<div class="tag">新實力模型賽前對照：${P.n} 場${P.n&&P.incumbent&&P.challenger?`；原分差誤差 ${P.incumbent.mae.toFixed(2)} / 新模型 ${P.challenger.mae.toFixed(2)} 分`:'（持續累積，不以歷史重算冒充賽前實績）'}。區間校準${MARGIN_MODEL.enabled?'已通過兩季檢查':'未通過啟用條件，沿用舊法'}；資料過期或歷史日期也會自動退回原估計。</div>`;
   }
   el.innerHTML=html;
 }

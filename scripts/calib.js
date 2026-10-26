@@ -18,11 +18,13 @@
 */
 const fs=require('fs');
 const path=require('path');
+const Margin=require('./margin-model.js');
 const {JSDOM,VirtualConsole}=require('jsdom');
 /* 版本:v3.0(傷兵改以最終分數加在 K 與季內乘數之後,上限 −7)v2.7(ESPN BPI 回補與三來源混合、官方裁判派遣、官方傷兵報告 PDF、球員異動、球隊進階統計快照)v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
+const F_MARGIN=path.join(ROOT,'margin-model.json');
 const F_SEED_OLD=path.join(ROOT,'seed-ledger.json');   // v1.5 舊格式,首次執行自動拆分後移除
 const D_SEED=path.join(ROOT,'seed');
 const F_META=path.join(D_SEED,'meta.json');
@@ -58,7 +60,7 @@ async function netFetch(url){
 const readJSON=(f,d)=>{try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch(e){return d;}};
 function etToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function shiftDate(d,n){const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
-const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;}if(e.mm!=null)o.mm=e.mm;if(e.mk!=null)o.mk=e.mk;if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
+const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;if(e.mbp!=null)o.mbp=e.mbp;}if(e.pg)o.pg=e.pg;if(e.tip)o.tip=e.tip;if(e.mm!=null)o.mm=e.mm;if(e.mk!=null)o.mk=e.mk;if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
 /* 依日期插入(保持紀錄簿時間順序,逐隊偏差才不會看錯場次) */
 function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+hi)>>1;if(arr[mid].d<=e.d)lo=mid+1;else hi=mid;}arr.splice(lo,0,e);}
 
@@ -108,7 +110,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   vc.on('jsdomError',e=>{if(!/Not implemented/.test(String(e&&e.message)))console.error('[jsdom]',e.message);});
   const dom=new JSDOM(html,{runScripts:'dangerously',url:'https://frankf19-19.github.io/NBA/',virtualConsole:vc,
     beforeParse(w){
-      w.__CLOUD_BUILD=true;
+      w.__CLOUD_BUILD=true;w.NBAMargin=Margin;
       w.HTMLCanvasElement.prototype.getContext=()=>({clearRect(){},beginPath(){},arc(){},fill(){},stroke(){},moveTo(){},lineTo(){},fillRect(){},
         createRadialGradient:()=>({addColorStop(){}}),createLinearGradient:()=>({addColorStop(){}}),ellipse(){}});
       w.matchMedia=()=>({matches:true,addListener(){},removeListener(){}});
@@ -123,6 +125,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
      (舊版掃描時仍是寫死的預設參數,m 與網站不一致;mp 另以最新參數重算,不受影響) */
   if(prev.prm&&isFinite(prev.prm.hca))E(`Object.assign(PRM,${JSON.stringify(prev.prm)});PRM.src='cloud';`);
   if(prev.mb&&Array.isArray(prev.mb.g))E(`MB=${JSON.stringify(prev.mb)}`);
+  const prevMargin=readJSON(F_MARGIN,null);if(prevMargin)E(`MARGIN_MODEL=${JSON.stringify(prevMargin)}`);
   {const mkp={};for(const [id,x] of Object.entries(PRE)){const of=(x.ofo&&x.ofo.length)?x.ofo:(x.of||null);if(x.mk!=null||x.bpi!=null||(of&&of.length))mkp[id]={mk:x.mk??null,of,bpi:x.bpi??null};}
     E(`MK_PRE=${JSON.stringify(mkp)}`);}   /* 賽前記錄的盤口與裁判,掃描入帳時沿用(不用賽後資料) */   /* 勝分差區間機率表(昨日學得),新場次的區間預測據此凍結 */
   /* 紀錄簿不放 localStorage(上限 500 萬字元,數萬場會爆):
@@ -224,7 +227,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           if(x.hs!=null){e.hs=x.hs;e.as=x.as;}
-          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1};   /* 賽前(含當日傷兵)預測,凍結 */
+          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip};   /* 賽前(含當日傷兵)預測,凍結 */
           return e;});
         if(fresh.length){fresh.forEach(e=>{have.add(e.id);haveKey.add(e.d+'|'+e.hid+'|'+e.aid);insertSorted(LED,e);byId.set(e.id,e);});added+=fresh.length;sAdd+=fresh.length;}
         return true;
@@ -434,6 +437,12 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const mbRate=list=>{const u=list.filter(e=>e.mp!=null);if(!u.length)return null;let h=0;for(const e of u){const p=predOf(e);const t=MBT.g.length?mbPickT(MBT.g,p).i:mbPickN(p,sigmaM);if(t===homeIdx(e))h++;}return +(h/u.length*100).toFixed(1);};
   console.log(`勝分差區間:採用 ${mbUse}(回測 實戰表 ${MBT.tot.emp}% / 常態 ${MBT.tot.norm}%),σ殘差 ${sigmaM}`);
 
+  /* Independent OOF margin calibration; never overwrite frozen historical forecasts. */
+  try{const artifact=Margin.build(LED,{cutoff:today,season:seasonNow});if(artifact){
+    fs.writeFileSync(F_MARGIN,JSON.stringify(artifact));E(`MARGIN_MODEL=${JSON.stringify(artifact)}`);
+    console.log('勝分差時間外校準',JSON.stringify(artifact.validation));
+  }}catch(e){console.error('勝分差校準保留上一版:',e.message);}
+
   /* ---------- 3.6) 多來源混合:模型 × 市場收盤線 × ESPN BPI。各組合(模型+市場、模型+BPI、三者)分別以時間順序滾動驗證
        (先 400 場起、每 150 場一段),測試段誤差比純模型低才啟用;權重取誤差最低者,相差 0.03 分內取模型權重最大者。
        BPI 只採用 lastModified 早於開球時間的版本(避免賽後更新的偷看) ---------- */
@@ -580,7 +589,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     E(`INJ_F=${+inj.f}`);
     for(const d of [today,shiftDate(today,1)]){
       const games=await W.fetchGames(d);
-      const live=games.filter(g=>g.status==='Preview'&&g.stype!==1&&g.homeId>=1&&g.homeId<=30&&g.awayId>=1&&g.awayId<=30);
+      const live=games.filter(g=>g.status==='Preview'&&(!g.startISO||Date.parse(g.startISO)>Date.now())&&g.stype!==1&&g.homeId>=1&&g.homeId<=30&&g.awayId>=1&&g.awayId<=30);
       if(!live.length)continue;
       const season=+E(`seasonOf('${d}')`),asOf=shiftDate(d,-1);
       const ids=[...new Set(live.flatMap(g=>[g.awayId,g.homeId]))];
@@ -603,14 +612,14 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         const p=W.predict(g,pm,lg,d);if(p.raw_margin_pre==null)continue;
         const ih=W.injInfo(g.homeId),ia=W.injInfo(g.awayId);
         PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),mm:+p.raw_margin.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
-          hn:ih.names,an:ia.names,p:+p.home_prob.toFixed(3),mb:p.mb,mbp:+(+p.mbp).toFixed(3),mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
+          hn:ih.names,an:ia.names,p:p.home_prob,mb:p.mb,mbp:p.mbp,q:p.mbProbs,interval:p.marginInterval??null,shadow:p.shadow??null,mv:p.distributionVersion??null,tip:g.startISO,mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
           bpi:(bp&&!bp.x)?bp.pd:null,bpiP:(bp&&!bp.x)?bp.hp:null,
           k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString(),u:2};preN++;
       }
       E('INJ_READY=false');
     }
     /* 已入紀錄簿但當時沒附賽前預測的,補附 */
-    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1};}}
+    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip};}}
     fs.writeFileSync(F_PRE,JSON.stringify(PRE));
   }catch(e){console.error('賽前預測失敗:',e.message);}
   fs.writeFileSync(F_DAILY,JSON.stringify(DAILY));   /* 賽前段落的執行記錄也要存 */
