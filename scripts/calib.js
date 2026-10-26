@@ -20,6 +20,7 @@ const fs=require('fs');
 const path=require('path');
 const Margin=require('./margin-model.js');
 const Quality=require('./quality-model.js');
+const InjuryTime=require('./injury-report-time.cjs');
 const {JSDOM,VirtualConsole}=require('jsdom');
 /* 版本:v3.0(傷兵改以最終分數加在 K 與季內乘數之後,上限 −7)v2.7(ESPN BPI 回補與三來源混合、官方裁判派遣、官方傷兵報告 PDF、球員異動、球隊進階統計快照)v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
@@ -542,7 +543,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     console.log(`官方裁判派遣:${REFTODAY.length} 場`);
   }catch(e){dlog('裁判派遣失敗:'+e.message);}
   /* NBA 官方傷兵報告 PDF(每天多版):取最新一份,存原文與解析後的列(球隊/球員/狀態/原因) */
-  let INJOFF=[];
+  let INJOFF=[],INJOFF_META=null;
   const TEAMGLUED=[...new Set(LED.filter(e=>e.sy>=seasonNow-1).flatMap(e=>[e.hm,e.aw]))].map(n=>String(n).replace(/\s+/g,'')).sort((a,b)=>b.length-a.length);
   try{const idx=await (await fetch(`https://official.nba.com/nba-injury-report-${seasonNow-1}-${String(seasonNow).slice(2)}-season/`,{headers:{'User-Agent':'Mozilla/5.0 (nba-scoreboard)'},signal:AbortSignal.timeout(20000)})).text();
     /* 連結格式 Injury-Report_YYYY-MM-DD_HH_MM(AM|PM).pdf,每 15 分鐘一版;頁面會列出整天的時段,實際存在的才抓得到,由最新往前試 */
@@ -552,8 +553,10 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     let L0=null,buf=null;
     for(const L of links.slice(0,12)){try{const r=await fetch(L.u,{signal:AbortSignal.timeout(30000)});if(r.ok){const b=Buffer.from(await r.arrayBuffer());if(b.length>2000&&b.slice(0,4).toString()==='%PDF'){L0=L;buf=b;break;}}}catch(e){}}
     if(L0){const key=`${L0.d}_${String(L0.h).padStart(2,'0')}${String(L0.mi).padStart(2,'0')}`;
-      if(!Object.values(DAILY.injpdf).some(x=>x.key===key&&x.pv===2)){
+      if(!Object.values(DAILY.injpdf).some(x=>x.key===key&&InjuryTime.usable(x))){
         let text='';try{const pdfParse=require('pdf-parse');text=(await pdfParse(buf)).text||'';}catch(e){console.error('pdf-parse 不可用:',e.message);}
+        const publishedAt=InjuryTime.publication(text);
+        if(!publishedAt||Date.parse(publishedAt)>Date.now())throw new Error('官方傷兵報告內文發布時間無法核實或晚於現在');
         /* pdf-parse 會把空白吃掉:每列形如 [日期][時間(ET)][AAA@BBB][球隊名]姓,名[,Jr.]狀態[原因],原因可能延到下一行 */
         const rows=[];let gd='',gt='',game='',team='';
         for(const raw of text.split(/\n/)){const ln=raw.replace(/\s+/g,'').trim();if(!ln||/^InjuryReport:|^Page\d|^GameDate/.test(ln))continue;
@@ -566,10 +569,11 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           else if(rows.length)rows[rows.length-1].r+=ln;}
         rows.forEach(x=>{x.r=x.r.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/-/g,' - ').replace(/\s+/g,' ').slice(0,80);});
         INJOFF=rows;
-        DAILY.injpdf[today]={key,pv:2,url:L0.u,n:rows.length,rows,raw:text.slice(0,60000)};
+        DAILY.injpdf[today]={key,pv:3,publishedAt,url:L0.u,n:rows.length,rows,raw:text.slice(0,60000)};
+        INJOFF_META=DAILY.injpdf[today];
         dlog(`官方傷兵報告:${key},解析 ${rows.length} 列,原文 ${text.length} 字`);}else dlog('官方傷兵報告:最新版已存過 '+key);}else dlog('官方傷兵報告:沒有抓到可用的 PDF');
   }catch(e){dlog('官方傷兵報告失敗:'+e.message);}
-  if(!INJOFF.length){const lastK=Object.keys(DAILY.injpdf||{}).sort().pop();if(lastK)INJOFF=DAILY.injpdf[lastK].rows||[];}   /* 本次沒有新版就用最近存的一份 */
+  if(!INJOFF.length){const lastK=Object.keys(DAILY.injpdf||{}).sort().pop();if(lastK&&InjuryTime.usable(DAILY.injpdf[lastK])){INJOFF_META=DAILY.injpdf[lastK];INJOFF=INJOFF_META.rows;}}   /* 本次沒有新版就用最近存的一份 */
   /* 球員異動(簽約、交易、釋出) */
   try{const d=await W.jget(`${SBu}/transactions?limit=100`);DAILY.tx=DAILY.tx||{};
     const seen=new Set(Object.values(DAILY.tx).flat().map(x=>x.d+'|'+x.t+'|'+x.s));const add=[];
@@ -606,8 +610,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       const pm={};await Promise.all(ids.map(async(id,i)=>{pm[id]=await W.statsWithPrior(id,season,asOf,d,seas[i]);}));
       const lg=W.leagueRPG(pm);const EF=W.effTable(d,season);
       W.__inj=await W.loadInjuries(ids);E('INJ=window.__inj;INJ_READY=true');
+      let officialForDate=null;
       {const md=`${d.slice(5,7)}/${d.slice(8,10)}/${d.slice(0,4)}`;const rowsD=INJOFF.filter(r=>r.d===md);
-        if(rowsD.length){W.__injOff=rowsD;const nOff=E('applyOfficialInjuries(window.__injOff)');dlog(`官方傷兵報告套用 ${d}:${nOff}/${rowsD.length} 筆(含 Doubtful/Questionable/Probable 分級)`);}}
+        if(rowsD.length){W.__injOff=rowsD;const nOff=E('applyOfficialInjuries(window.__injOff)');if(nOff>0)officialForDate=INJOFF_META;dlog(`官方傷兵報告套用 ${d}:${nOff}/${rowsD.length} 筆(含 Doubtful/Questionable/Probable 分級)`);}}
       setCur(d);
       for(const g of live){
         let hw=0,aw=0;(seas[ids.indexOf(g.homeId)]||[]).forEach(r=>{if(r.done&&r.oppId===g.awayId&&r.pf!=null&&r.date<d){if(r.won)hw++;else aw++;}});
@@ -621,7 +626,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         const p=W.predict(g,pm,lg,d);if(p.raw_margin_pre==null)continue;
         const ih=W.injInfo(g.homeId),ia=W.injInfo(g.awayId);
         PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),mm:+p.raw_margin.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
-          hn:ih.names,an:ia.names,p:p.home_prob,mb:p.mb,mbp:p.mbp,qv:p.qualityVersion,qn:p.qualityName,baseMargin:p.baseMargin,injAlt:p.injuryAlternativeMargin,q:p.mbProbs,interval:p.marginInterval??null,shadow:p.shadow??null,mv:p.distributionVersion??null,tip:g.startISO,mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
+          injOfficial:officialForDate?{publishedAt:officialForDate.publishedAt,url:officialForDate.url}:null,hn:ih.names,an:ia.names,p:p.home_prob,mb:p.mb,mbp:p.mbp,qv:p.qualityVersion,qn:p.qualityName,baseMargin:p.baseMargin,injAlt:p.injuryAlternativeMargin,q:p.mbProbs,interval:p.marginInterval??null,shadow:p.shadow??null,mv:p.distributionVersion??null,tip:g.startISO,mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
           bpi:(bp&&!bp.x)?bp.pd:null,bpiP:(bp&&!bp.x)?bp.hp:null,
           k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString(),u:2};preN++;
       }

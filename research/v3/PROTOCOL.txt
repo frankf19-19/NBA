@@ -1,0 +1,53 @@
+Round 3 protocol, fixed before new model results.
+Comparator: v3.2 reconstructed nested-selected OOF point forecasts.
+Player ratings fit only completed games in two earlier seasons; never use
+current-game players/minutes as prediction inputs. Expected rotations come
+from strictly earlier appearances. Same-day predictions precede updates.
+Point menu: baseline, venue correction, player-level correction, roster-change
+correction, joint roster/venue correction. Four-season correction fit, three
+prior OOF seasons for selection; minimum .03 MAE improvement, RMSE +.02 max,
+winner -1pp max, simplest within .02. Outer reporting 2015-2026 and 2021-2026.
+Player ridge alpha=100, prior two seasons, last-five appearance EMA .35.
+Separate variance study: predict twelve bins using OOF mean, fatigue and
+past volatility/rotation features; bandwidth/complexity fixed before results.
+No future lineups or retrospective absences as pregame features. Retrospective
+nested evaluation is not a new prospective test. No auto-enable from a small
+in-sample or final-cohort gain. Keep market/BPI out of formal predictions.
+Variance protocol locked before evaluating interval outcomes:
+OOF annual log-variance ridge (penalty 100), previous four seasons, minimum
+2000 observations; log residual-squared clipped [4,900]. Scale calibrated on
+training residuals, predicted SD clipped [8,24]. Features: intercept, log past
+20-game residual variance, abs mean/20, rotation concentration/change,
+absolute fatigue, expected pace. Candidates: v3.2 kernel grid; conditional
+Gaussian; conditional Student-t(df=8); KDE of earlier standardized OOF
+residuals (bandwidth .15). KDE fallback to baseline until 2000 earlier SD
+forecasts. Select using only prior 3 seasons: log loss improvement >=.002,
+multiclass Brier +.0005 max, top-1 decline <=.002; simplest within .001 log
+loss. Evaluate 2016-2026 and recent 2021-2026; no retuning after results.
+Additional calibration hypothesis (locked before these results): current
+probability tables omit completed games of the current season. Compare
+Gaussian-kernel counts with recency half-life 500/1000 games (last 4000,
+same-date equal ages), and degree-2 multinomial logit (C=1, predictor mean
+clipped +/-30, mirrored data; pure or 50% kernel blend), plus non-mirrored
+logit. No point changes. Apply the SAME prior-three-season selection rule
+as the variance study to the complete menu. All results remain retrospective.
+Final uncertainty-range study, fixed before its outcomes: compare current
+previous-three-season q10/q90 interval with rolling absolute/signed residual
+windows 500/1000. Target coverage .80; lower/upper empirical ranks use floor/
+ceil((n+1)*q), absolute uses ceil((n+1)*.80). Minimum history 300, update after
+whole dates. Select using prior 3 seasons only: interval-score improvement
+>=.05, coverage error <= baseline+.005; simplest within .05 score. Report
+2016-2026 and 2021-2026. Promotion requires recent paired-day interval-score
+CI upper <0, improved coverage error, width increase <=2 points and >=4/6
+improved seasons. This is range calibration, NOT a point or bin-hit gain.
+Historical official-injury study fixed before outcomes: join by team/date, require
+both teams explicitly submitted and PDF HEADER earlier than ledger tip. Only
+unambiguous canonical name matches. PPG uses earlier games (current GP>=5,
+else prior GP>=8), attendance=.65 season+.35 past10; no future appearances.
+Compare raw PPG loss and incremental attendance loss, fixed weights
+Out=1,Doubtful=.75,Questionable=.4,Probable=.1,Available=0. Single through-origin
+ridge coefficient fitted on previous seasons, min500. Evaluate 2024-2026,
+no candidate selection on test years. Report all models, eligible/missing audit.
+Promotion requires paired-date MAE CI upper<0, improvement >=.05, RMSE and
+winner nonregression, improvement >=2/3 seasons. Retrospective reconstruction
+is not a frozen live-prediction test. No blanket accuracy claims.

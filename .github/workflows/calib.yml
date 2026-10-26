@@ -37,6 +37,7 @@ jobs:
         run: |
           node scripts/test-margin-unit.cjs
           node scripts/test-quality-unit.cjs
+          node scripts/test-injury-report-time.cjs
       - name: 執行校準
         env:
           NBA_FAST_REFRESH: ${{ github.event_name == 'push' && '1' || '0' }}

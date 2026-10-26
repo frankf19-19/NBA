@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),T=require('./injury-report-time.cjs');
+assert.equal(T.publication('Injury Report: 01/02/25 01:30 PM'),'2025-01-02T18:30:00.000Z');
+assert.equal(T.publication('Injury Report: 07/02/25 05:00 PM'),'2025-07-02T21:00:00.000Z');
+assert.equal(T.publication('InjuryReport:01/02/2501:30PM'),'2025-01-02T18:30:00.000Z');
+for(const s of ['','Injury Report: 02/30/25 05:00 PM','Injury Report: 01/02/25 13:30 PM','Injury Report: 03/09/25 02:30 AM','Injury Report: 11/02/25 01:30 AM'])assert.equal(T.publication(s),null,s);
+const r={pv:3,rows:[],publishedAt:'2025-01-02T18:30:00.000Z'};
+assert(T.usable(r,Date.parse('2025-01-02T18:31Z')));
+assert(!T.usable(r,Date.parse('2025-01-02T18:00Z')));
+assert(!T.usable({...r,pv:2}));assert(!T.usable({...r,publishedAt:null}));
+console.log('Injury report time checks passed: printed time, ET DST, invalid/future/unverified reports.');
