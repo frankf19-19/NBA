@@ -24,6 +24,7 @@ const {JSDOM,VirtualConsole}=require('jsdom');
 /* 版本:v3.0(傷兵改以最終分數加在 K 與季內乘數之後,上限 −7)v2.7(ESPN BPI 回補與三來源混合、官方裁判派遣、官方傷兵報告 PDF、球員異動、球隊進階統計快照)v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
+const FAST_REFRESH=process.env.NBA_FAST_REFRESH==='1';
 const F_CALIB=path.join(ROOT,'calib.json');
 const F_MARGIN=path.join(ROOT,'margin-model.json');
 const F_QUALITY=path.join(ROOT,'quality-model.json');
@@ -168,10 +169,10 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     }
     console.log(`${label}:處理 ${n}/${todo.length} 場`);
   };
-  await fetchBox('box score(掃描前)');
+  if(!FAST_REFRESH)await fetchBox('box score(掃描前)');
   /* 歷史場次補齊完整原始資料:每次最多 BX_PER_RUN 場,由新到舊,幾週內自動補完 1994-95 季起全部 */
   {const need=e=>!e.bxx&&(!(e.px>=2)||(e.sy>=seasonNow0-PBP_BACK_SEASONS&&!e.pb&&!e.pbx));
-    const bk=LED.filter(need).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,BX_PER_RUN);
+    const bk=LED.filter(need).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,FAST_REFRESH?0:BX_PER_RUN);
     if(bk.length)await fetchBox(`完整原始資料回補(剩 ${LED.filter(need).length} 場)`,bk);}
 
   /* ESPN BPI 賽前預測(predictor):主隊勝率與預期分差,近 10 季可回補;記下 lastModified 以便只採用開打前的版本 */
@@ -183,7 +184,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       return {hp:+((side[0]==='h'?wp:100-wp)/100).toFixed(3),pd:pd==null?null:+((side[0]==='h'?pd:-pd)).toFixed(2),lm:p.lastModified||null};
     }catch(e){return null;}};
   {const need=e=>e.sy>=seasonNow0-PBP_BACK_SEASONS&&!e.bpi&&!e.bpx&&!e.po&&!(PRE[e.id]&&PRE[e.id].bpi!=null);
-    const bk=LED.filter(need).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,BX_PER_RUN);let n=0;
+    const bk=LED.filter(need).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,FAST_REFRESH?0:BX_PER_RUN);let n=0;
     for(let i=0;i<bk.length;i+=PL_BATCH){await Promise.all(bk.slice(i,i+PL_BATCH).map(async e=>{const r=await fetchBPI(e.id);if(!r)return;if(r.x)e.bpx=1;else{e.bpi=r;n++;}}));}
     if(bk.length)console.log(`ESPN BPI 回補:${n}/${bk.length} 場(剩 ${LED.filter(need).length-bk.length} 場)`);}
 
@@ -195,7 +196,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const byId=new Map(LED.map(e=>[String(e.id),e]));
   let fAdded=0;
   let added=0,errors=0,days=0;
-  for(let sy=FIRST_SEASON;sy<=seasonNow;sy++){
+  for(let sy=FAST_REFRESH?seasonNow:FIRST_SEASON;sy<=seasonNow;sy++){
     const m=meta.seasons[sy]||{};
     if(m.complete)continue;
     const retry=Array.isArray(m.fail)?m.fail.slice():[];
@@ -249,7 +250,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   console.log(`回補 ${days} 天,新增 ${added} 場,補記成分 ${fAdded} 場,錯誤 ${errors},紀錄簿共 ${LED.length} 場`);
 
   /* ---------- 2) 新增場次的 box score ---------- */
-  await fetchBox('box score(新增場次)');
+  await fetchBox('box score(新增場次)',FAST_REFRESH?LED.filter(e=>e.sy===seasonNow&&(!e.pl||!e.ts)&&!e.tsx):undefined);
 
   /* ---------- 2.5) 參數學習與公平回測 ---------- */
   const DEF={hca:2.6,b2b:-1.6,r34:0.3,r5:-0.4,g4:-0.8,mo4:0.6,mo2:0.25,h2h:0.15,h2hCap:0.45};
@@ -506,7 +507,9 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   /* ---------- 5) 全聯盟球員資料庫 ---------- */
   let pdbN=0;
   try{
-    await W.buildPDB();
+    const cached=readJSON(F_PDB,null);
+    if(FAST_REFRESH&&cached&&cached.ts&&Date.now()-cached.ts<36*3600000&&Object.keys(cached.players||{}).length>=200)E(`PDB=${JSON.stringify(cached)}`);
+    else await W.buildPDB();
     const pdb=JSON.parse(JSON.stringify(E('PDB')));
     pdbN=Object.keys(pdb.players||{}).length;
     if(pdbN>=200)fs.writeFileSync(F_PDB,JSON.stringify(pdb));
@@ -635,7 +638,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const F_COACH=path.join(D_SEED,'coaches.json');const COACH=readJSON(F_COACH,{});
   try{
     const teamIds=[...new Set(LED.filter(e=>e.sy>=seasonNow-1).flatMap(e=>[e.hid,e.aid]))].filter(x=>x>=1&&x<=30);
-    const need=[];for(let sy=FIRST_SEASON;sy<=seasonNow;sy++){if(sy===seasonNow||!COACH[sy]||Object.keys(COACH[sy]).length<25)need.push(sy);}
+    const need=[];for(let sy=FAST_REFRESH?seasonNow:FIRST_SEASON;sy<=seasonNow;sy++){if(sy===seasonNow||!COACH[sy]||Object.keys(COACH[sy]).length<25)need.push(sy);}
     let calls=0;
     for(const sy of need.slice(-3).concat(need.length>3?need.slice(0,-3).slice(0,2):[])){   /* 每次最多處理 5 季,幾天內補完 */
       const o=COACH[sy]||{};

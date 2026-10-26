@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: nba-calib
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   calibrate:
@@ -38,6 +38,8 @@ jobs:
           node scripts/test-margin-unit.cjs
           node scripts/test-quality-unit.cjs
       - name: 執行校準
+        env:
+          NBA_FAST_REFRESH: ${{ github.event_name == 'push' && '1' || '0' }}
         run: node scripts/calib.js
       - name: 提交結果
         run: |
