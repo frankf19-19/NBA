@@ -1,6 +1,12 @@
 name: 每日雲端校準
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - 'scripts/**'
+      - .github/workflows/calib.yml
   schedule:
     # GitHub 的排程在低流量 repo 常延後 4~9 小時(實測 06:10 排程多在 10:30~15:00 才跑),
     # 所以一天排三次,哪一次先跑到就先更新;每次都是增量、可重複執行,concurrency 保證不重疊
@@ -28,14 +34,16 @@ jobs:
       - name: 安裝 jsdom(雲端直接執行網頁本身的模型)
         run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@24 pdf-parse@1.1.1
       - name: 驗證勝分差核心
-        run: node scripts/test-margin-unit.cjs
+        run: |
+          node scripts/test-margin-unit.cjs
+          node scripts/test-quality-unit.cjs
       - name: 執行校準
         run: node scripts/calib.js
       - name: 提交結果
         run: |
           git config user.name "calib-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add -A calib.json pdb.json margin-model.json seed
+          git add -A calib.json pdb.json margin-model.json quality-model.json seed
           git add -u
           git diff --cached --quiet && exit 0
           git commit -m "每日自動校準 $(date -u +%F)"

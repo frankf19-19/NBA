@@ -19,12 +19,14 @@
 const fs=require('fs');
 const path=require('path');
 const Margin=require('./margin-model.js');
+const Quality=require('./quality-model.js');
 const {JSDOM,VirtualConsole}=require('jsdom');
 /* 版本:v3.0(傷兵改以最終分數加在 K 與季內乘數之後,上限 −7)v2.7(ESPN BPI 回補與三來源混合、官方裁判派遣、官方傷兵報告 PDF、球員異動、球隊進階統計快照)v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
 
 const ROOT=path.resolve(__dirname,'..');
 const F_CALIB=path.join(ROOT,'calib.json');
 const F_MARGIN=path.join(ROOT,'margin-model.json');
+const F_QUALITY=path.join(ROOT,'quality-model.json');
 const F_SEED_OLD=path.join(ROOT,'seed-ledger.json');   // v1.5 舊格式,首次執行自動拆分後移除
 const D_SEED=path.join(ROOT,'seed');
 const F_META=path.join(D_SEED,'meta.json');
@@ -60,6 +62,7 @@ async function netFetch(url){
 const readJSON=(f,d)=>{try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch(e){return d;}};
 function etToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function shiftDate(d,n){const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
+const verifiedPregame=e=>!!(e.pg&&e.pg.at&&(e.pg.tip||e.tip)&&Date.parse(e.pg.at)<Date.parse(e.pg.tip||e.tip));
 const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;if(e.mbp!=null)o.mbp=e.mbp;}if(e.pg)o.pg=e.pg;if(e.tip)o.tip=e.tip;if(e.mm!=null)o.mm=e.mm;if(e.mk!=null)o.mk=e.mk;if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
 /* 依日期插入(保持紀錄簿時間順序,逐隊偏差才不會看錯場次) */
 function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+hi)>>1;if(arr[mid].d<=e.d)lo=mid+1;else hi=mid;}arr.splice(lo,0,e);}
@@ -110,7 +113,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   vc.on('jsdomError',e=>{if(!/Not implemented/.test(String(e&&e.message)))console.error('[jsdom]',e.message);});
   const dom=new JSDOM(html,{runScripts:'dangerously',url:'https://frankf19-19.github.io/NBA/',virtualConsole:vc,
     beforeParse(w){
-      w.__CLOUD_BUILD=true;w.NBAMargin=Margin;
+      w.__CLOUD_BUILD=true;w.NBAMargin=Margin;w.NBAQuality=Quality;
       w.HTMLCanvasElement.prototype.getContext=()=>({clearRect(){},beginPath(){},arc(){},fill(){},stroke(){},moveTo(){},lineTo(){},fillRect(){},
         createRadialGradient:()=>({addColorStop(){}}),createLinearGradient:()=>({addColorStop(){}}),ellipse(){}});
       w.matchMedia=()=>({matches:true,addListener(){},removeListener(){}});
@@ -125,6 +128,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
      (舊版掃描時仍是寫死的預設參數,m 與網站不一致;mp 另以最新參數重算,不受影響) */
   if(prev.prm&&isFinite(prev.prm.hca))E(`Object.assign(PRM,${JSON.stringify(prev.prm)});PRM.src='cloud';`);
   if(prev.mb&&Array.isArray(prev.mb.g))E(`MB=${JSON.stringify(prev.mb)}`);
+  const prevQuality=readJSON(F_QUALITY,null);if(prevQuality)E(`QUALITY_MODEL=${JSON.stringify(prevQuality)}`);
   const prevMargin=readJSON(F_MARGIN,null);if(prevMargin)E(`MARGIN_MODEL=${JSON.stringify(prevMargin)}`);
   {const mkp={};for(const [id,x] of Object.entries(PRE)){const of=(x.ofo&&x.ofo.length)?x.ofo:(x.of||null);if(x.mk!=null||x.bpi!=null||(of&&of.length))mkp[id]={mk:x.mk??null,of,bpi:x.bpi??null};}
     E(`MK_PRE=${JSON.stringify(mkp)}`);}   /* 賽前記錄的盤口與裁判,掃描入帳時沿用(不用賽後資料) */   /* 勝分差區間機率表(昨日學得),新場次的區間預測據此凍結 */
@@ -227,7 +231,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           if(x.hs!=null){e.hs=x.hs;e.as=x.as;}
-          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip};   /* 賽前(含當日傷兵)預測,凍結 */
+          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip,qv:pg.qv,qn:pg.qn,baseMargin:pg.baseMargin,injAlt:pg.injAlt};   /* 賽前(含當日傷兵)預測,凍結 */
           return e;});
         if(fresh.length){fresh.forEach(e=>{have.add(e.id);haveKey.add(e.d+'|'+e.hid+'|'+e.aid);insertSorted(LED,e);byId.set(e.id,e);});added+=fresh.length;sAdd+=fresh.length;}
         return true;
@@ -443,6 +447,8 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     console.log('勝分差時間外校準',JSON.stringify(artifact.validation));
   }}catch(e){console.error('勝分差校準保留上一版:',e.message);}
 
+  try{const artifact=Quality.build(LED,{cutoff:today,season:seasonNow});if(artifact){fs.writeFileSync(F_QUALITY,JSON.stringify(artifact));E(`QUALITY_MODEL=${JSON.stringify(artifact)}`);console.log('點分差逐季驗證',JSON.stringify({enabled:artifact.enabled,choice:artifact.selection.name,recent:artifact.statistics.recent}));}}catch(e){console.error('點分差模型保留上一版:',e.message);}
+
   /* ---------- 3.6) 多來源混合:模型 × 市場收盤線 × ESPN BPI。各組合(模型+市場、模型+BPI、三者)分別以時間順序滾動驗證
        (先 400 場起、每 150 場一段),測試段誤差比純模型低才啟用;權重取誤差最低者,相差 0.03 分內取模型權重最大者。
        BPI 只採用 lastModified 早於開球時間的版本(避免賽後更新的偷看) ---------- */
@@ -492,7 +498,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
     PRMF.ref={use,n:rows.length,refs:Object.keys(build(rows)).length,eval:ev};if(use)PRMF.ref.tab=build(rows);
     console.log('裁判因子:',JSON.stringify({...PRMF.ref,tab:undefined}));
   }
-  E(`Object.assign(PRM,${JSON.stringify({mk:PRMF.mk,mkb:PRMF.mkb,mk3:PRMF.mk3,ref:PRMF.ref})})`);
+  E(`Object.assign(PRM,${JSON.stringify({tb:PRMF.tb,mk:PRMF.mk,mkb:PRMF.mkb,mk3:PRMF.mk3,ref:PRMF.ref})})`);
 
   /* ---------- 4) 主力缺陣係數(由完整紀錄簿學習) ---------- */
   const inj=JSON.parse(JSON.stringify(W.learnInjFactor(LED)));
@@ -612,14 +618,14 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         const p=W.predict(g,pm,lg,d);if(p.raw_margin_pre==null)continue;
         const ih=W.injInfo(g.homeId),ia=W.injInfo(g.awayId);
         PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),mm:+p.raw_margin.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
-          hn:ih.names,an:ia.names,p:p.home_prob,mb:p.mb,mbp:p.mbp,q:p.mbProbs,interval:p.marginInterval??null,shadow:p.shadow??null,mv:p.distributionVersion??null,tip:g.startISO,mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
+          hn:ih.names,an:ia.names,p:p.home_prob,mb:p.mb,mbp:p.mbp,qv:p.qualityVersion,qn:p.qualityName,baseMargin:p.baseMargin,injAlt:p.injuryAlternativeMargin,q:p.mbProbs,interval:p.marginInterval??null,shadow:p.shadow??null,mv:p.distributionVersion??null,tip:g.startISO,mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
           bpi:(bp&&!bp.x)?bp.pd:null,bpiP:(bp&&!bp.x)?bp.hp:null,
           k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString(),u:2};preN++;
       }
       E('INJ_READY=false');
     }
     /* 已入紀錄簿但當時沒附賽前預測的,補附 */
-    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip};}}
+    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip,qv:pg.qv,qn:pg.qn,baseMargin:pg.baseMargin,injAlt:pg.injAlt};}}
     fs.writeFileSync(F_PRE,JSON.stringify(PRE));
   }catch(e){console.error('賽前預測失敗:',e.message);}
   fs.writeFileSync(F_DAILY,JSON.stringify(DAILY));   /* 賽前段落的執行記錄也要存 */
@@ -675,14 +681,14 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   let injPG=null;
   {
     const K=+E('MARGIN_K');
-    const rows=LED.filter(e=>e.pg&&e.pg.u===2&&e.mp!=null&&!e.po&&!e.nu&&!e.nm&&e.pg.f>0&&(e.pg.ih||e.pg.ia))
-      .map(e=>{const ph=phM(e);return {x:(e.pg.ih-e.pg.ia)/e.pg.f,y:e.am-K*ph*e.mp};});   /* ih/ia 已是最終分數單位(v3.0 起,u=2) */
+    const rows=LED.filter(e=>verifiedPregame(e)&&e.pg.u===2&&Number.isFinite(e.pg.mm)&&e.mp!=null&&!e.po&&!e.nu&&!e.nm&&e.pg.f>0&&(e.pg.ih||e.pg.ia))
+      .map(e=>{const ph=phM(e);return {x:(e.pg.ih-e.pg.ia)/e.pg.f,y:e.am-(e.pg.mm-(e.pg.ih-e.pg.ia)),f0:e.pg.f};});   /* ih/ia 已是最終分數單位(v3.0 起,u=2) */
     if(rows.length>=150){
       const fit=rs=>{let xy=0,xx=0;rs.forEach(r=>{xy+=r.x*r.y;xx+=r.x*r.x;});return xx>0?xy/xx:0;};
       const cut=Math.floor(rows.length*0.6),tr=rows.slice(0,cut),te=rows.slice(cut);
       const fT=Math.max(0.02,Math.min(0.3,fit(tr)));
       const mae=(rs,f)=>rs.reduce((a,r)=>a+Math.abs(r.y-f*r.x),0)/rs.length;
-      const m0=mae(te,inj.f),m1=mae(te,fT);   /* inj.f 與 fT 同為最終分數單位 */
+      const m0=te.reduce((a,r)=>a+Math.abs(r.y-r.f0*r.x),0)/te.length,m1=mae(te,fT);   /* inj.f 與 fT 同為最終分數單位 */
       injPG={n:rows.length,f:+Math.max(0.02,Math.min(0.3,fit(rows))).toFixed(3),fTrain:+fT.toFixed(2),before:+m0.toFixed(3),after:+m1.toFixed(3),adopt:m1<m0-0.005};
       if(injPG.adopt){inj.f=injPG.f;inj.src='pregame';inj.nPG=rows.length;}
       console.log('賽前傷兵係數學習:',JSON.stringify(injPG));
@@ -691,11 +697,11 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
 
   /* ---------- 5.7) 本季對照:我們(開打前凍結的最終預測)vs 市場收盤線 vs ESPN BPI,只比較不混合 ---------- */
   let CMP=null;
-  {const rows=LED.filter(e=>e.sy===seasonNow&&!e.po&&!e.nm&&e.mm!=null);
+  {const rows=LED.filter(e=>e.sy===seasonNow&&!e.po&&!e.nm&&verifiedPregame(e)&&Number.isFinite(e.pg.mm));
     const stat=(f,lab)=>{const r=rows.filter(e=>f(e)!=null);if(!r.length)return null;const n=r.length;
       return {lab,n,hit:+(r.filter(e=>(f(e)>=0)===(e.am>0)).length/n*100).toFixed(1),mae:+(r.reduce((a,e)=>a+Math.abs(e.am-f(e)),0)/n).toFixed(2),
-        full:+(r.filter(e=>{const t=MBT.g.length?mbPickT(MBT.g,f(e)).i:mbPickN(f(e),sigmaM);return t===homeIdx(e);}).length/n*100).toFixed(1)};};
-    CMP={n:rows.length,ours:stat(e=>e.mm,'我們'),mkt:stat(e=>e.mk!=null?e.mk:null,'市場收盤線'),bpi:stat(e=>(e.bpi&&e.bpi.pre&&e.bpi.pd!=null)?e.bpi.pd:null,'ESPN BPI')};
+        full:lab==='我們'&&r.some(e=>e.pg.mb!=null)?+(r.filter(e=>e.pg.mb!=null&&e.pg.mb===homeIdx(e)).length/r.filter(e=>e.pg.mb!=null).length*100).toFixed(1):null};};
+    CMP={verified:true,n:rows.length,ours:stat(e=>e.pg.mm,'我們'),mkt:stat(e=>e.pg.mk!=null?e.pg.mk:null,'市場賽前盤口快照'),bpi:stat(e=>(e.bpi&&e.bpi.pre&&e.bpi.pd!=null)?e.bpi.pd:null,'ESPN BPI')};
     console.log('本季對照:',JSON.stringify(CMP));}
 
   /* ---------- 6) 輸出 ---------- */
@@ -711,7 +717,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       mae:rp.length?+(rp.reduce((a,e)=>a+Math.abs(e.am-e.m*K),0)/rp.length).toFixed(1):null,
       mb:(sy===seasonNow&&rp.some(e=>e.mbh!=null))?+(rp.filter(e=>e.mbh).length/rp.filter(e=>e.mbh!=null).length*100).toFixed(1):mbRate(rp),   /* 本季用凍結的預測,歷史以現行表回算 */
       pl:all.filter(e=>e.pl&&e.pl.h&&e.pl.a).length};});
-  const health={withPb:LED.filter(e=>e.pb).length,withOf:LED.filter(e=>e.of).length,withOd:LED.filter(e=>e.od).length,withBx:LED.filter(e=>e.bx).length,withPg:LED.filter(e=>e.pg).length,withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
+  const health={withPb:LED.filter(e=>e.pb).length,withOf:LED.filter(e=>e.of).length,withOd:LED.filter(e=>e.od).length,withBx:LED.filter(e=>e.bx).length,withPg:LED.filter(e=>e.pg).length,verifiedPg:LED.filter(verifiedPregame).length,withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
     fixed,added,errors,fitN:samples.length,pdb:pdbN,seasonsN:seasons.length,seasons,secs:Math.round((Date.now()-t0)/1000)};
   const fit={variant,prm:PRMF,K:KF,coef:coefF,trainN:finalTrain.length,win:WIN,bt,tot,hcaBySeason,phEval};
   const calib={k:K,sigma:S,injF:inj.f,inj,injPG,prm:PRMF,mb:MBT,styles:STY,cmp:CMP,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
