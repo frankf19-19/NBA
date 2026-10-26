@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NBA 預測計分板</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2230%22%20fill%3D%22%231e1726%22/%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2230%22%20fill%3D%22none%22%20stroke%3D%22%236fb7ff%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%222%22/%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2223%22%20fill%3D%22%23e8833a%22/%3E%3Cpath%20d%3D%22M9%2032h46M32%209v46M14%2015a24%2024%200%20010%2034M50%2015a24%2024%200%20000%2034%22%20stroke%3D%22%230c1a2b%22%20stroke-width%3D%222.2%22%20fill%3D%22none%22/%3E%3Cpolyline%20points%3D%2222%2C41%2029%2C33%2034%2C36%2043%2C24%22%20fill%3D%22none%22%20stroke%3D%22%230c1a2b%22%20stroke-width%3D%224.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3Cpolyline%20points%3D%2222%2C41%2029%2C33%2034%2C36%2043%2C24%22%20fill%3D%22none%22%20stroke%3D%22%236fb7ff%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3Ccircle%20cx%3D%2243%22%20cy%3D%2224%22%20r%3D%223.4%22%20fill%3D%22%23ff9f43%22/%3E%3C/svg%3E">
+<meta name="description" content="NBA 每日賽程、即時比分、勝率模型、球員資料與歷史回測。賽程採美東日期，開賽時間顯示台灣時間。">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
@@ -327,7 +328,7 @@
     .status{grid-column:1/3;margin-left:0;text-align:left;font-size:11.5px}
     section{margin-top:18px}
     #homeView{display:flex;flex-direction:column}
-    #homeView>section:last-child{order:-1}   /* 比賽先、總評與新聞在後 */
+    #homeView>section:first-child{order:-1}   /* 比賽先、總評與新聞在後 */
     .game{padding:12px 12px}
     .nm-full{display:none} .nm-short{display:inline}
     .team .rec{white-space:nowrap}
@@ -345,6 +346,13 @@
     .game,.player,.headline{animation:rise .4s ease both}
     @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   }
+  .date-note{font-size:12px;color:var(--muted);margin:0 0 8px}
+  :focus-visible{outline:3px solid var(--teal);outline-offset:4px}
+  button,input,select{min-height:40px}
+  .game{content-visibility:auto;contain-intrinsic-size:auto 440px}
+  .sec-head[role=button]{border-radius:6px}
+  @media(max-width:600px){.nav,.today-btn,.theme-b{min-height:44px}h1{font-size:30px}.datebar{gap:8px}.score-row{gap:14px}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
 <body>
@@ -356,13 +364,14 @@
     <h1 id="homeLink"><svg class="sitelogo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#1e1726"/><circle cx="32" cy="32" r="30" fill="none" stroke="#6fb7ff" stroke-opacity=".35" stroke-width="2"/><circle cx="32" cy="32" r="23" fill="#e8833a"/><path d="M9 32h46M32 9v46M14 15a24 24 0 010 34M50 15a24 24 0 000 34" stroke="#0c1a2b" stroke-width="2.2" fill="none"/><polyline points="22,41 29,33 34,36 43,24" fill="none" stroke="#0c1a2b" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><polyline points="22,41 29,33 34,36 43,24" fill="none" stroke="#6fb7ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="43" cy="24" r="3.4" fill="#ff9f43"/></svg><span>NBA 預測計分板</span></h1>
 
     <div class="searchbar">
-      <input type="text" id="searchBox" placeholder="搜尋球員(輸入英文姓名,例如 Curry、LeBron…)">
+      <input type="text" id="searchBox" aria-label="搜尋 NBA 球員英文姓名" autocomplete="off" placeholder="搜尋球員(輸入英文姓名,例如 Curry、LeBron…)">
     </div>
     <div class="search-results" id="searchResults"></div>
 
+    <p class="date-note">賽程日期：美東時間 · 開賽時間：台灣時間</p>
     <div class="datebar" id="datebar">
       <button class="nav" id="prevBtn" title="前一天">◀</button>
-      <input type="date" id="datePick">
+      <input type="date" id="datePick" aria-label="美東賽程日期">
       <button class="nav" id="nextBtn" title="後一天">▶</button>
       <button class="today-btn" id="todayBtn">今天</button>
       <button class="today-btn" id="calibBtn">模型體檢</button>
@@ -371,15 +380,19 @@
     </div>
     <div id="themeBar"></div>
     <div class="score-row" id="statRow">
-      <div class="stat"><div class="num" id="dayPct">—</div><div class="lbl">當日命中率</div></div>
+      <div class="stat"><div class="num" id="dayPct">—</div><div class="lbl">當日模型命中率</div></div>
       <div class="stat"><div class="num small" id="dayRec">—</div><div class="lbl">命中 / 已完賽</div></div>
       <div class="stat"><div class="num small" id="dayErr">—</div><div class="lbl">平均分差誤差</div></div>
       <div class="stat"><div class="num small" id="dayFull" style="color:var(--amber)">—</div><div class="lbl">全中(勝方+分差區間)</div></div>
-      <div class="status" id="status"></div>
+      <div class="status" id="status" role="status" aria-live="polite"></div>
     </div>
   </header>
 
-  <div id="homeView">
+  <main id="homeView">
+    <section>
+      <div class="sec-head"><h2 id="listTitle">比賽</h2><span class="tag" id="listTag"></span></div>
+      <div id="games"><div class="empty">載入中…</div></div>
+    </section>
     <section id="calibSec" class="hidden">
       <div class="sec-head"><h2>模型體檢(校準)</h2><span class="tag">用過去實戰檢驗信心是否誠實</span></div>
       <div class="analysis" style="border-left-color:var(--teal)">
@@ -406,14 +419,11 @@
       <div id="headlines"></div>
     </section>
     <section id="txSec" class="hidden">
-      <div class="sec-head"><h2>聯盟動態</h2><span class="tag">ESPN 官方新聞 · 真實資訊</span></div>
+      <div class="sec-head"><h2>聯盟動態</h2><span class="tag">ESPN 最新新聞 · 不隨歷史日期回溯</span></div>
       <div id="txList"></div>
     </section>
-    <section>
-      <div class="sec-head"><h2 id="listTitle">比賽</h2><span class="tag" id="listTag"></span></div>
-      <div id="games"><div class="empty">載入中…</div></div>
-    </section>
-  </div>
+
+  </main>
 
   <div id="teamView" class="hidden">
     <section>
@@ -447,10 +457,17 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.0.1 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.0.2 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
+// 儲存空間不可用時，仍允許瀏覽與切換主題。
+const memoryStorage=new Map();
+const storage={
+  getItem(key){try{return window.localStorage.getItem(key)??memoryStorage.get(key)??null;}catch{return memoryStorage.get(key)??null;}},
+  setItem(key,value){memoryStorage.set(key,String(value));try{window.localStorage.setItem(key,String(value));}catch{}},
+  removeItem(key){memoryStorage.delete(key);try{window.localStorage.removeItem(key);}catch{}}
+};
 const SB='https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
 const CORE='https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba';
 /* 模型參數:預設值 = 原本寫死的數字;雲端以 4 萬場資料迴歸學習後覆寫(calib.json 的 prm),
@@ -473,20 +490,40 @@ function phaseMult(date){
 /* 顯示用:參數換算成實際分數(內部參數 × 分差刻度 K) */
 const PTS=v=>{const x=v*MARGIN_K;return (x>0?'+':'')+x.toFixed(1);};
 const HOME_PT_BOOST=2.6;
-let RUN_SIGMA=parseFloat(localStorage.getItem('nba_sigma'))||11.5;
-let MARGIN_K=parseFloat(localStorage.getItem('nba_mk'))||1.0;
+let RUN_SIGMA=Math.max(8,Math.min(16,parseFloat(storage.getItem('nba_sigma'))||11.5));
+let MARGIN_K=Math.max(.7,Math.min(1.4,parseFloat(storage.getItem('nba_mk'))||1.0));
 const $=id=>document.getElementById(id);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r1=x=>Math.round(x*10)/10;
-async function jget(url){const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
+const pendingRequests=new Map();
+function jget(url){
+  if(pendingRequests.has(url))return pendingRequests.get(url);
+  const task=(async()=>{
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),15000);
+    try{
+      const r=await fetch(url,{signal:controller.signal});
+      if(!r.ok)throw new Error('資料服務暫時無法使用 ('+r.status+')');
+      return await r.json();
+    }catch(e){if(e.name==='AbortError')throw new Error('連線逾時，請再試一次');throw e;}
+    finally{clearTimeout(timeout);pendingRequests.delete(url);}
+  })();
+  pendingRequests.set(url,task);return task;
+}
 function erf(x){const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);
   const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y;}
 const normCdf=z=>0.5*(1+erf(z/Math.SQRT2));
 const log5=(pa,pb)=>{const d=pa+pb-2*pa*pb;return d===0?0.5:(pa-pa*pb)/d;};
+function etDate(value=new Date()){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(value));
+  const part=type=>parts.find(p=>p.type===type).value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+function etToday(){return etDate();}
 const ET_FMT=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
 /* 美東「今天」:直接以美東時區格式化。舊寫法先轉成字串再 new Date(),會被當成瀏覽器本地時間解析,
    在台灣 12:00–20:00(美東 0–8 點)會算成前一天——今天按鈕、傷兵套用、即時更新全都跟著錯一天 */
-function etToday(){return ET_FMT.format(new Date());}
+
 function etDateOf(iso){if(!iso)return '';if(iso.length<=10)return iso;const t=Date.parse(iso.length===17&&iso.endsWith('Z')?iso.replace('Z',':00Z'):iso);return isFinite(t)?ET_FMT.format(new Date(t)):iso.slice(0,10);}
 function shiftDate(ds,n){const d=new Date(ds+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 function taipeiTime(iso){try{return new Date(iso).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){return null;}}
@@ -547,11 +584,13 @@ async function fetchGames(date){
 
 /* 各隊球季逐場紀錄(快取);回看任何日期都取「該日之前」,不偷看未來 */
 const schedCache={};
+const schedCacheTimes={};
 function fetchTeamSeason(teamId,season){
   const key=teamId+'_'+season;
-  if(schedCache[key])return schedCache[key];
+  if(schedCache[key]&&Date.now()-(schedCacheTimes[key]||0)<300000)return schedCache[key];
+  schedCacheTimes[key]=Date.now();
   schedCache[key]=(async()=>{
-    const rows=[];
+    const rows=[];let failures=0;
     for(const t of [2,3]){ /* 2=例行賽 3=季後賽 */
       try{
         const d=await jget(`${SB}/teams/${teamId}/schedule?season=${season}&seasontype=${t}`);
@@ -567,8 +606,10 @@ function fetchTeamSeason(teamId,season){
             won:me.winner===true,oppId:+(opp.id||opp.team?.id||0),
             home:me.homeAway==='home'});
         });
-      }catch(e){}
+      }catch(e){failures++;}
     }
+    if(failures){delete schedCache[key];delete schedCacheTimes[key];}
+    if(failures===2)throw new Error('球隊賽程暫時無法載入');
     rows.sort((a,b)=>a.date.localeCompare(b.date));
     return rows;
   })();
@@ -624,8 +665,8 @@ function leagueRPG(pm){const v=Object.values(pm).filter(t=>t.rs!=null&&t.gp);
 /* ---------- 全聯盟球員資料庫:30 隊全名單 + 每人本季數據,快取於裝置、每日背景更新 ---------- */
 const PDB_KEY='nba_pdb_v1';
 let PDB={ts:0,season:null,players:{},teams:{}};
-function loadPDB(){try{const x=JSON.parse(localStorage.getItem(PDB_KEY));if(x&&x.players)PDB=x;}catch(e){}}
-function savePDB(){try{localStorage.setItem(PDB_KEY,JSON.stringify(PDB));}catch(e){}}
+function loadPDB(){try{const x=JSON.parse(storage.getItem(PDB_KEY));if(x&&x.players)PDB=x;}catch(e){}}
+function savePDB(){try{storage.setItem(PDB_KEY,JSON.stringify(PDB));}catch(e){}}
 /* 雲端每天更新一次,但 GitHub 排程常延後數小時,門檻放到 40 小時以免瀏覽器自己重抓 500 多名球員 */
 function pdbStale(){return !PDB.ts||(Date.now()-PDB.ts)>40*3600*1000||PDB.season!==seasonOf(etToday());}
 function pdbStat(id){const p=PDB.players[id];if(!p)return null;
@@ -754,7 +795,7 @@ async function capturePlayerLines(maxN,since){
     try{const r=parsePlayerLines(await jget(`${SB}/summary?event=${e.id}`));
       if(r){e.pl=r.pl;e.hid=r.hid;e.aid=r.aid;n++;}}catch(err){}
   }
-  localStorage.setItem('nba_ledger',JSON.stringify(L));
+  storage.setItem('nba_ledger',JSON.stringify(L));
   return n;
 }
 
@@ -995,10 +1036,10 @@ function predict(g,pm,lg,date){
   const H=pm[g.homeId]||{},A=pm[g.awayId]||{};
   const ok=lg&&H.gp>=5&&A.gp>=5;
   if(!ok){
-    const hPct=H.pct??parsePct(g.homeRec)??.5,aPct=A.pct??parsePct(g.awayRec)??.5;
+    const hPct=H.pct??.5,aPct=A.pct??.5;
     const hp=Math.max(.05,Math.min(.95,log5(hPct,aPct)+0.06));
     return {home_prob:hp,away_prob:1-hp,predicted_winner:hp>=.5?g.home:g.away,
-      why:`資料不足(球季初、季前賽或夏季聯賽),改以兩隊勝率(主 ${hPct.toFixed(3)} vs 客 ${aPct.toFixed(3)})加主場優勢估計。`};
+      why:`資料不足(球季初、季前賽或夏季聯賽),改以賽前可取得勝率(缺資料採 0.500；主 ${hPct.toFixed(3)} vs 客 ${aPct.toFixed(3)})加主場優勢估計。`};
   }
   const factors=[];
   const hRS=H.rs/H.gp,hRA=H.ra/H.gp,aRS=A.rs/A.gp,aRA=A.ra/A.gp;
@@ -1177,7 +1218,7 @@ function review(g,p){
     if(p.raw_margin!=null){
       const err=Math.abs(actMargin-p.raw_margin);
       if(err<=4)t+=`實際分差與預期(${r1(p.margin)} 分)相當接近,這場模型讀得準。`;
-      else if(Math.abs(actMargin)>Math.abs(p.raw_margin))t+=`不過實際贏 ${Math.abs(actMargin)} 分,比預期的 ${r1(p.margin)} 分大——${p.restAdjusted&&p.moAdjusted?'即使已計入體能與氣勢,':''}當日手感或垃圾時間把差距放大了。`;
+      else if(Math.abs(actMargin)>Math.abs(p.raw_margin))t+=`不過實際贏 ${Math.abs(actMargin)} 分,比預期的 ${r1(p.margin)} 分大——${p.restAdjusted&&p.moAdjusted?'即使已計入體能與氣勢,':''}分差原因需另外查看比賽內容，單靠目前資料無法判定。`;
       else t+=`但實際只贏 ${Math.abs(actMargin)} 分,比預期的 ${r1(p.margin)} 分驚險。`;
     }
   }else{
@@ -1259,9 +1300,9 @@ function gameCard(g,p,rv){
     Number.isFinite(g._mk)?`盤口 主隊 ${g._mk>0?'-':'+'}${Math.abs(g._mk)}`:null,
     Number.isFinite(g._bpi)?`ESPN BPI 主隊 ${g._bpi>0?'+':''}${g._bpi}`:null,
     g.startTpe?('台灣時間 '+g.startTpe):null,
-    g.venue,
+    g.venue?esc(g.venue):null,
     (!isFinal&&!isLive)?ldrSeg:null,
-    (!isFinal&&!isLive&&g.detail&&!/Scheduled|\d:\d\d\s*[AP]M/i.test(g.detail))?g.detail:null].filter(Boolean).join(' · ');
+    (!isFinal&&!isLive&&g.detail&&!/Scheduled|\d:\d\d\s*[AP]M/i.test(g.detail))?esc(g.detail):null].filter(Boolean).join(' · ');
   const special=/postpon/i.test(g.detail+g.typeName)?'延賽':/suspend/i.test(g.detail+g.typeName)?'保留比賽'
     :/cancel/i.test(g.detail+g.typeName)?'取消':null;
   const pill=special?`<span class="pill wait">${special}</span>`
@@ -1383,10 +1424,14 @@ function buildDailySummary(date,games,preds,reviews,acc){
   return parts.join('');
 }
 
+let dayRequestId=0;
 async function loadDay(quiet){
   quiet=(quiet===true);
   const date=$('datePick').value;if(!date)return;
+  const requestId=++dayRequestId;
+  clearInterval(refreshTimer);refreshTimer=null;
   if(!quiet)showView('home');
+  $('games').setAttribute('aria-busy','true');
   const btn=$('loadBtn');
   if(!quiet){btn.disabled=true;btn.classList.add('spin');}
   const st=$('status');
@@ -1398,9 +1443,11 @@ async function loadDay(quiet){
     const ids=[...new Set(games.flatMap(g=>[g.awayId,g.homeId]).filter(Boolean))];
     const seas=await Promise.all(ids.map(id=>fetchTeamSeason(id,season).catch(()=>[])));
     const pm={};await Promise.all(ids.map(async(id,i)=>{pm[id]=await statsWithPrior(id,season,asOf,date,seas[i]);}));
+    if(requestId!==dayRequestId||date!==$('datePick').value)return;
     const lg=leagueRPG(pm);
     const EFF_DAY=effTable(date,season);
     await attachGameInfo(games,date);
+    if(requestId!==dayRequestId||date!==$('datePick').value)return;
     INJ_READY=false;
     if(date>=etToday()){
       st.textContent='載入 '+date+' …(讀取官方傷兵名單)';
@@ -1410,6 +1457,7 @@ async function loadDay(quiet){
         if(INJ_CACHE.key===key&&Date.now()-INJ_CACHE.ts<600000)INJ=INJ_CACHE.v;else{INJ=await loadInjuries(ids);INJ_CACHE={key,ts:Date.now(),v:INJ};}
         INJ_READY=true;}catch(e){}
     }
+    if(requestId!==dayRequestId||date!==$('datePick').value)return;
     /* 已完賽:若雲端紀錄簿有「開打前凍結」的預測,顯示與統計一律以凍結值為準(不用賽後資料重算) */
     const FR={};if(date<etToday())ledger().forEach(e=>{if(e.d===date&&e.mm!=null)FR[e.id]=e;});
     const seasById={};ids.forEach((id,i)=>seasById[id]=seas[i]||[]);
@@ -1424,8 +1472,8 @@ async function loadDay(quiet){
     games.forEach(g=>{
       const A=pm[g.awayId],H=pm[g.homeId];
       const recOf=t=>t.prior?`${t.curW}-${t.curL}`:`${t.w}-${t.l}`;
-      if(A&&A.gp&&!g.awayRec)g.awayRec=recOf(A);
-      if(H&&H.gp&&!g.homeRec)g.homeRec=recOf(H);
+      if(A&&A.gp)g.awayRec=recOf(A);
+      if(H&&H.gp)g.homeRec=recOf(H);
       g._eff=EFF_DAY;
       const p=predict(g,pm,lg,date);
       if(g.status==='Final'&&FR[g.id]&&p.raw_margin!=null)applyFrozen(p,FR[g.id],g);
@@ -1453,10 +1501,10 @@ async function loadDay(quiet){
     clearInterval(refreshTimer);refreshTimer=null;
     if(anyLive&&date===etToday()){
       refreshTimer=setInterval(()=>{
-        if(!$('homeView').classList.contains('hidden'))loadDay(true);
+        if(!document.hidden&&!$('homeView').classList.contains('hidden'))loadDay(true);
       },45000);
     }
-    st.textContent=(finals?`完成 · ${finals} 場已完賽已比對`:'完成 · 該日尚無完賽結果')
+    st.textContent='更新 '+new Date().toLocaleTimeString('zh-TW',{hour12:false})+' · '+(finals?`完成 · ${finals} 場已完賽已比對`:'完成 · 該日尚無完賽結果')
       +(refreshTimer?' · 🔴 每 45 秒自動更新':'');
     bindTeamClicks();
     loadTransactions(date);
@@ -1464,9 +1512,9 @@ async function loadDay(quiet){
     const summary=buildDailySummary(date,games,curPreds,reviews,{hits,errSum,errN,fulls,mbN});
     $('aiText').textContent=summary;
     $('aiSec').classList.toggle('hidden',!summary);
-  }catch(e){st.className='status err';st.textContent='載入失敗:'+e.message;
+  }catch(e){if(requestId!==dayRequestId)return;st.className='status err';st.textContent='載入失敗:'+e.message;
     if(!quiet)$('games').innerHTML=`<div class="empty">讀取不到資料,請確認網路後再試。</div>`;}
-  finally{if(!quiet){btn.disabled=false;btn.classList.remove('spin');}}
+  finally{if(requestId===dayRequestId){$('games').setAttribute('aria-busy','false');btn.disabled=false;btn.classList.remove('spin');}}
 }
 
 /* ---------- 球員數據 → 標記與強弱項 ---------- */
@@ -1600,9 +1648,10 @@ function bindTeamClicks(){
 }
 
 /* ---------- 球員搜尋(ESPN 全站搜尋,限 NBA) ---------- */
-let searchTimer=null;
+let searchTimer=null,searchRequestId=0;
 $('searchBox').addEventListener('input',()=>{
   clearTimeout(searchTimer);
+  const requestId=++searchRequestId;
   const q=$('searchBox').value.trim();
   if(q.length<2){$('searchResults').innerHTML='';return;}
   const renderHits=hits=>{
@@ -1624,6 +1673,7 @@ $('searchBox').addEventListener('input',()=>{
     try{
       $('searchResults').innerHTML='<div class="empty">搜尋中…</div>';
       const d=await jget(`https://site.web.api.espn.com/apis/search/v2?limit=16&query=${encodeURIComponent(q)}`);
+      if(requestId!==searchRequestId)return;
       const items=[];
       (d.results||[]).forEach(r=>{
         if(!/player|athlete/i.test(r.type||''))return;
@@ -1635,7 +1685,7 @@ $('searchBox').addEventListener('input',()=>{
         });
       });
       renderHits(items.slice(0,8));
-    }catch(e){$('searchResults').innerHTML=`<div class="empty">搜尋失敗:${esc(e.message)}</div>`;}
+    }catch(e){if(requestId!==searchRequestId)return;$('searchResults').innerHTML=`<div class="empty">搜尋失敗:${esc(e.message)}</div>`;}
   },300);
 });
 /* ---------- 本季對戰戰績(用快取賽程即時統計) ---------- */
@@ -1650,6 +1700,7 @@ async function loadH2H(games,season){
         if(r.date>=date)return;
         if(r.won)hw++;else aw++;
       });
+      if(date!==$('datePick').value)return;
       const el=document.getElementById('h2h-'+g.id);
       if(!el)return;
       el.textContent=(hw+aw)?`本季對戰 ${aw}–${hw}(客–主)${hw>aw?' · 主隊佔優':aw>hw?' · 客隊佔優':' · 平手'}`:'本季首次交手';
@@ -1671,7 +1722,7 @@ async function loadTransactions(date){
       let t='';
       try{t=new Date(a.published).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){}
       const url=a.links?.web?.href;
-      const head=url?`<a href="${esc(url)}" target="_blank" rel="noopener" style="color:var(--chalk);font-weight:600;text-decoration:none">${esc(a.headline)}</a>`:`<b>${esc(a.headline)}</b>`;
+      const head=url&&/^https:\/\//i.test(url)?`<a href="${esc(url)}" target="_blank" rel="noopener" style="color:var(--chalk);font-weight:600;text-decoration:none">${esc(a.headline)}</a>`:`<b>${esc(a.headline)}</b>`;
       return `<div class="headline"><span class="hk">${esc(t||'新聞')}</span>${head}${a.description?` — <span style="color:var(--muted)">${esc(a.description)}</span>`:''}</div>`;
     }).join('');
     $('txSec').classList.remove('hidden');
@@ -1988,7 +2039,7 @@ async function loadCloud(){
         if(c.prm&&isFinite(c.prm.hca)){Object.assign(PRM,c.prm);PRM.src='cloud';}
         if(c.mb&&Array.isArray(c.mb.g))MB=c.mb;
         if(c.styles)STY=c.styles;
-        if(cloudFresh()){localStorage.setItem('nba_mk',String(MARGIN_K));localStorage.setItem('nba_sigma',String(RUN_SIGMA));}}}
+        if(cloudFresh()){storage.setItem('nba_mk',String(MARGIN_K));storage.setItem('nba_sigma',String(RUN_SIGMA));}}}
   }catch(e){}
   renderFooter();
   try{
@@ -2022,17 +2073,17 @@ function renderFooter(){
     `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.0.1 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.0.2 · 資料來源:ESPN 公開 API`;
 }
-function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
+function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
-  localStorage.setItem('nba_calib_hist',JSON.stringify(h));}
-function ledger(){if(cloudFresh()&&Array.isArray(CLOUD.ledger))return CLOUD.ledger.slice();try{return JSON.parse(localStorage.getItem('nba_ledger'))||[]}catch(e){return[]}}
+  storage.setItem('nba_calib_hist',JSON.stringify(h));}
+function ledger(){if(cloudFresh()&&Array.isArray(CLOUD.ledger))return CLOUD.ledger.slice();try{return JSON.parse(storage.getItem('nba_ledger'))||[]}catch(e){return[]}}
 function mergeLedger(entries){
   const L=ledger(),seen=new Set(L.map(x=>x.id));
   entries.forEach(e=>{if(!seen.has(e.id)){L.push(e);seen.add(e.id);}});
   while(L.length>600)L.shift();
-  localStorage.setItem('nba_ledger',JSON.stringify(L));
+  storage.setItem('nba_ledger',JSON.stringify(L));
   return L.length;
 }
 function renderCalibHist(){
@@ -2217,20 +2268,20 @@ const hitRateOf=samples=>samples.filter(x=>(x.m>=0)===x.homeWon).length/samples.
 async function autoCalibrate(){
   if(calibRunning)return;
   if(cloudFresh())return; /* 雲端已校準,各裝置一致 */
-  if(localStorage.getItem('nba_calib_last')===etToday())return;
+  if(storage.getItem('nba_calib_last')===etToday())return;
   calibRunning=true;
   const st=$('status');
   try{
     const {samples}=await collectSamples(14,(i,n)=>{
       st.textContent=`🔧 每日自動校準中 ${i}/${n} 天…(不影響瀏覽)`;});
-    localStorage.setItem('nba_calib_last',etToday());
+    storage.setItem('nba_calib_last',etToday());
     if(samples.length>=30){
       const nk=bestK(samples);
       const kChanged=Math.abs(nk-MARGIN_K)>0.005;
-      if(kChanged){MARGIN_K=nk;localStorage.setItem('nba_mk',String(nk));}
+      if(kChanged){MARGIN_K=nk;storage.setItem('nba_mk',String(nk));}
       const {best}=bestSigma(samples,MARGIN_K);
       const sChanged=Math.abs(best-RUN_SIGMA)>0.01;
-      if(sChanged){RUN_SIGMA=best;localStorage.setItem('nba_sigma',String(best));}
+      if(sChanged){RUN_SIGMA=best;storage.setItem('nba_sigma',String(best));}
       const hit=hitRateOf(samples);
       const total=mergeLedger(samples.map(x=>({id:x.id,d:x.d,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,
         m:+x.m.toFixed(2),am:x.actM,hit:((x.m>=0)===x.homeWon)?1:0})));
@@ -2319,15 +2370,15 @@ $('calibRun').addEventListener('click',async()=>{
       <div class="tag" style="margin-top:8px">K=分差係數(校正比分刻度)、σ=勝率鈍感度(校正信心刻度);每天首開自動校準並套用。「實際均差」為實際分差在預測方向上的平均——與「預測均差」越接近,比分越可信。</div>`;
     const ap=$('calibApply');
     if(ap)ap.addEventListener('click',()=>{
-      MARGIN_K=nk;localStorage.setItem('nba_mk',String(nk));
-      RUN_SIGMA=best;localStorage.setItem('nba_sigma',String(best));
+      MARGIN_K=nk;storage.setItem('nba_mk',String(nk));
+      RUN_SIGMA=best;storage.setItem('nba_sigma',String(best));
       pushCalibHist({d:etToday(),s:+best.toFixed(2),k:+nk.toFixed(2),hit:+(hitRate*100).toFixed(1),n:samples.length});
       ap.textContent='已套用 ✓';ap.disabled=true;renderCalibHist();loadDay();renderFooter();
     });
     const rs=$('calibReset');
     if(rs)rs.addEventListener('click',()=>{
-      RUN_SIGMA=11.5;localStorage.removeItem('nba_sigma');
-      MARGIN_K=1.0;localStorage.removeItem('nba_mk');
+      RUN_SIGMA=11.5;storage.removeItem('nba_sigma');
+      MARGIN_K=1.0;storage.removeItem('nba_mk');
       rs.textContent='已還原 ✓';rs.disabled=true;loadDay();renderFooter();
     });
     renderCalibHist();
@@ -2397,7 +2448,7 @@ async function showStandings(fromPop){
       el.addEventListener('click',()=>showTeam(+el.dataset.team,el.textContent.replace(/^\d+\.\s*/,'')));});
   }catch(e){$('standings').innerHTML=`<div class="empty">戰績載入失敗:${esc(e.message)}</div>`;}
 }
-$('standBtn').addEventListener('click',showStandings);
+$('standBtn').addEventListener('click',()=>showStandings());
 $('stBackBtn').addEventListener('click',()=>history.back());
 
 /* ---------- 背景主題(動畫粒子) ---------- */
@@ -2433,8 +2484,8 @@ const THEMES=[
   {id:'TOR',abbr:'TOR',name:'多倫多暴龍',c1:'#1c1c20',c2:'#ff2b4e',pal:{field:'#212129',panel:'#2e2e3b',panel2:'#383847',glow:'#55556d',amber:'#ff2b4e',teal:'#b4975a',chalk:'#f5f5f7',muted:'#9d9da9',line:'rgba(245,245,247,.16)',wash:'rgba(255,255,255,.08)',wash2:'rgba(255,255,255,.15)',ink2:'#d9d9de',btnInk:'#212129'},palL:{field:'#e5e5ed',panel:'#ffffff',panel2:'#efeff3',glow:'#b4b4cf',amber:'#ff2b4e',teal:'#1c1c20',chalk:'#212126',muted:'#646472',line:'rgba(33,33,38,.16)',wash:'rgba(33,33,38,.06)',wash2:'rgba(33,33,38,.12)',ink2:'#393941',btnInk:'#ffffff'}},
   {id:'UTA',abbr:'UTA',name:'猶他爵士',c1:'#002b5c',c2:'#f9a01b',pal:{field:'#052345',panel:'#083160',panel2:'#0b3c74',glow:'#135cae',amber:'#f9a01b',teal:'#57c48f',chalk:'#f5f6f7',muted:'#8fa2b7',line:'rgba(245,246,247,.16)',wash:'rgba(255,255,255,.08)',wash2:'rgba(255,255,255,.15)',ink2:'#d6dbe0',btnInk:'#052345'},palL:{field:'#dce8f6',panel:'#ffffff',panel2:'#eaf1f8',glow:'#9abfea',amber:'#945c04',teal:'#002b5c',chalk:'#142334',muted:'#4d6989',line:'rgba(20,35,52,.16)',wash:'rgba(20,35,52,.06)',wash2:'rgba(20,35,52,.12)',ink2:'#283c53',btnInk:'#ffffff'}},
   {id:'WAS',abbr:'WAS',name:'華盛頓巫師',c1:'#12294f',c2:'#ff5063',pal:{field:'#061d44',panel:'#0a2a5f',panel2:'#0e3372',glow:'#1b50a7',amber:'#ff5063',teal:'#cdd6e4',chalk:'#f5f6f7',muted:'#8f9eb7',line:'rgba(245,246,247,.16)',wash:'rgba(255,255,255,.08)',wash2:'rgba(255,255,255,.15)',ink2:'#d6dae0',btnInk:'#061d44'},palL:{field:'#dce6f6',panel:'#ffffff',panel2:'#eaeff8',glow:'#9bb8e8',amber:'#ff3c51',teal:'#12294f',chalk:'#142034',muted:'#4d6489',line:'rgba(20,32,52,.16)',wash:'rgba(20,32,52,.06)',wash2:'rgba(20,32,52,.12)',ink2:'#283853',btnInk:'#ffffff'}}];
-let themeMode=localStorage.getItem('nba_mode_v2')||'light';
-let fxTheme=localStorage.getItem('nba_theme')||'nba';
+let themeMode=storage.getItem('nba_mode_v2')||'light';
+let fxTheme=storage.getItem('nba_theme')||'nba';
 if(!THEMES.some(t=>t.id===fxTheme))fxTheme='nba';
 const fxCanvas=document.getElementById('fx');
 const fxCtx=fxCanvas.getContext('2d');
@@ -2455,6 +2506,7 @@ function fxInit(){
     c:Math.random()<.5?c1:c2,tw:rnd(0,6.28)});
 }
 function fxTick(t){
+  if(document.hidden){fxRAF=null;return;}
   const dt=Math.min(.05,(t-fxLast)/1000||.016);fxLast=t;
   const W=fxCanvas.width,H=fxCanvas.height;
   fxCtx.clearRect(0,0,W,H);
@@ -2470,7 +2522,7 @@ function fxTick(t){
   fxRAF=requestAnimationFrame(fxTick);
 }
 function applyTheme(id){
-  fxTheme=id;localStorage.setItem('nba_theme',id);
+  fxTheme=id;storage.setItem('nba_theme',id);
   const th=THEMES.find(t=>t.id===id)||THEMES[0];
   const pal=(themeMode==='light'&&th.palL)?th.palL:th.pal;
   const r=document.documentElement.style;
@@ -2494,7 +2546,7 @@ function applyTheme(id){
   document.querySelectorAll('.theme-b').forEach(b=>b.classList.toggle('on',b.dataset.t===id));
   cancelAnimationFrame(fxRAF);fxRAF=null;
   fxCtx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
-  if(reduceMotion)return;
+  if(reduceMotion||document.hidden)return;
   fxInit();fxLast=0;fxRAF=requestAnimationFrame(fxTick);
 }
 const tb=document.getElementById('themeBar');
@@ -2504,7 +2556,7 @@ tb.innerHTML='<span style="font-family:var(--cond);letter-spacing:.1em;font-size
 tb.querySelectorAll('.theme-b[data-t]').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.t)));
 document.getElementById('modeBtn').addEventListener('click',()=>{
   themeMode=themeMode==='light'?'dark':'light';
-  localStorage.setItem('nba_mode_v2',themeMode);
+  storage.setItem('nba_mode_v2',themeMode);
   document.getElementById('modeBtn').textContent=themeMode==='light'?'☀️':'🌙';
   applyTheme(fxTheme);
 });
@@ -2518,16 +2570,23 @@ function initCollapsibles(ids){
     head.classList.add('click');
     const h2=head.querySelector('h2');
     if(h2&&!h2.querySelector('.caret'))h2.insertAdjacentHTML('beforeend','<span class="caret">▾</span>');
-    if(localStorage.getItem('nba_col_'+id)==='1')sec.classList.add('collapsed');
+    if(storage.getItem('nba_col_'+id)==='1')sec.classList.add('collapsed');
+    head.setAttribute('role','button');head.tabIndex=0;
+    head.setAttribute('aria-expanded',String(!sec.classList.contains('collapsed')));
+    head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();head.click();}});
     head.addEventListener('click',()=>{
       sec.classList.toggle('collapsed');
-      localStorage.setItem('nba_col_'+id,sec.classList.contains('collapsed')?'1':'0');
+      head.setAttribute('aria-expanded',String(!sec.classList.contains('collapsed')));
+      storage.setItem('nba_col_'+id,sec.classList.contains('collapsed')?'1':'0');
     });
   });
 }
 initCollapsibles(['aiSec','headlineSec','txSec']);
 
 /* ---------- 瀏覽器上一頁/下一頁支援 ---------- */
+addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&!reduceMotion&&!fxRAF){fxLast=0;fxRAF=requestAnimationFrame(fxTick);}
+});
 addEventListener('popstate',e=>{
   const s=e.state||{v:'home'};
   if(s.v==='team')showTeam(s.id,s.name,true);
@@ -2538,6 +2597,19 @@ addEventListener('popstate',e=>{
 });
 history.replaceState({v:'home'},'');
 
+// 讓動態產生的球隊、球員入口可透過鍵盤開啟。
+function accessibleLinks(root=document){
+  root.querySelectorAll('[data-team],[data-pid]').forEach(el=>{
+    if(el.tagName==='BUTTON'||el.tagName==='A')return;
+    el.tabIndex=0;el.setAttribute('role','button');
+  });
+}
+new MutationObserver(()=>accessibleLinks()).observe(document.querySelector('.wrap'),{childList:true,subtree:true});
+document.addEventListener('keydown',e=>{
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-team],[data-pid],#homeLink')){e.preventDefault();e.target.click();}
+  if(e.key==='Escape'){++searchRequestId;clearTimeout(searchTimer);$('searchResults').innerHTML='';}
+});
+$('homeLink').tabIndex=0;$('homeLink').setAttribute('role','button');
 const dp=$('datePick');
 dp.value=etToday();
 $('loadBtn').addEventListener('click',()=>loadDay());
