@@ -447,7 +447,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.0 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.0.1 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script>
@@ -502,6 +502,14 @@ const daysBetween=(a,b)=>Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00
 const parsePct=rec=>{const m=/^(\d+)-(\d+)/.exec(rec||'');if(!m)return null;const w=+m[1],l=+m[2];return (w+l)?w/(w+l):null;};
 function parseClock(c){const m=/(\d+):(\d+)/.exec(c||'');if(m)return +m[1]*60+ +m[2];const f=parseFloat(c);return isFinite(f)?f:0;}
 const perTxt=p=>p==null?'':(p<=4?`第${p}節`:`OT${p-4>1?p-4:''}`);
+/* 比賽進行中的時間文字:中場/節末/剩餘時間(剩不到 1 分鐘時顯示秒數) */
+function liveClockTxt(g){
+  const d=String(g.detail||'');
+  if(/halftime/i.test(d))return '中場休息';
+  if(/^end of/i.test(d)||(parseClock(g.clock)===0&&g.period))return `${perTxt(g.period)}結束`;
+  const sec=parseClock(g.clock);
+  return `${perTxt(g.period)} 剩 ${sec<60&&g.clock&&!/:/.test(g.clock)?g.clock+' 秒':(g.clock||'')}`;
+}
 
 /* ---------- 資料抓取(ESPN 公開 API) ---------- */
 async function fetchGames(date){
@@ -1211,7 +1219,7 @@ function liveAnalysis(g,p){
   const {p:lp}=liveWinProb(d,g.period,g.clock,p.raw_margin);
   const preHome=p.home_prob??.5;
   const lead=d===0?'雙方平手':`${d>0?g.home:g.away} 領先 ${Math.abs(d)} 分`;
-  let t=`${perTxt(g.period)} ${g.clock||''},${lead}。即時勝率:主隊 ${(lp*100).toFixed(0)}%(賽前 ${(preHome*100).toFixed(0)}%)。`;
+  let t=`${liveClockTxt(g)},${lead}。即時勝率:主隊 ${(lp*100).toFixed(0)}%(賽前 ${(preHome*100).toFixed(0)}%)。`;
   const preFavHome=preHome>=.5;
   if((lp>=.5)!==preFavHome&&Math.abs(lp-.5)>=.1)t+=`戰局翻轉中——賽前看好的一方目前居於下風。`;
   if(g.period>=4&&Math.abs(d)<=5)t+=`進入決勝時刻五分差內攻防,每一波進攻都是關鍵。`;
@@ -1258,7 +1266,7 @@ function gameCard(g,p,rv){
     :/cancel/i.test(g.detail+g.typeName)?'取消':null;
   const pill=special?`<span class="pill wait">${special}</span>`
     :isFinal?(rv?`<span class="pill ${rv.hit?'hit':'miss'}">${rv.hit?'命中':'未中'}</span>${rv.mbHit?'<span class="pill full">★ 全中</span>':''}`:'<span class="pill wait">終場</span>')
-    :isLive?`<span class="pill live"><span class="dot"></span>LIVE ${perTxt(g.period)}</span>`
+    :isLive?`<span class="pill live"><span class="dot"></span>LIVE ${esc(liveClockTxt(g))}</span>`
     :`<span class="pill wait">未開打</span>`;
   let teamsHtml;
   if(hasLines){
@@ -1276,7 +1284,7 @@ function gameCard(g,p,rv){
   const duel=ld=>ld?`<div class="duel">${avatarImg(ld.id,ld.name,'sr-ava')}<div><div class="role">得分王</div><div class="dnm" data-pid="${ld.id}">${esc(ld.name)}</div>${ld.val?`<div class="pi-inn">${esc(ld.val)} 分</div>`:''}</div></div>`:'';
   const liveRow=isLive?`<div class="live-row">
       ${duel(g.aLdr)}${duel(g.hLdr)}
-      <div class="basestate">${ballSvg()}<span class="outs"><b>${perTxt(g.period)}</b> · ${esc(g.clock||'')}</span></div>
+      <div class="basestate">${ballSvg()}<span class="outs"><b>${esc(liveClockTxt(g))}</b></span></div>
     </div>`:'';
   const bestLine=isFinal&&(g.aLdr||g.hLdr)?`全場最佳:${[g.aLdr?`${shortTeam(g.away)} ${g.aLdr.name} ${g.aLdr.val} 分`:null,g.hLdr?`${shortTeam(g.home)} ${g.hLdr.name} ${g.hLdr.val} 分`:null].filter(Boolean).join(' · ')}`:null;
   const predLine=hasScore
@@ -1746,7 +1754,7 @@ async function loadGame(gid){
     const st=ts.state==='in'?'Live':(ts.state==='post'?'Final':'Preview');
     const period=hc.status?.period,clock=hc.status?.displayClock;
     const aR=away.score!=null?+away.score:0,hR=home.score!=null?+home.score:0;
-    const innTxt=st==='Live'?`${perTxt(period)} ${clock||''}`:(st==='Final'?'終場':ts.shortDetail||'');
+    const innTxt=st==='Live'?liveClockTxt({period,clock,detail:ts.detail||ts.shortDetail||''}):(st==='Final'?'終場':ts.shortDetail||'');
     const recOf=t=>{const r=(t.record||[]);const o=r.find(x=>x.type==='total')||r[0];return o?(o.summary||o.displayValue||''):'';};
     const lines=t=>(t.linescores||[]).map(l=>l.displayValue!=null?l.displayValue:(l.value!=null?l.value:''));
     const aL=lines(away),hL=lines(home);
@@ -2014,7 +2022,7 @@ function renderFooter(){
     `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.0 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大,強隊命中率長期約六到七成屬正常。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.0.1 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(localStorage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
