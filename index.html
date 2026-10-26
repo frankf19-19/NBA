@@ -860,7 +860,7 @@ async function fetchGameInfo(gid){
 let PREG={ts:0,sy:null,v:null};
 async function loadPregame(date){   /* 雲端賽前檔:盤口、官方裁判、ESPN BPI(網頁無法直接跨域抓 BPI,靠雲端每天記) */
   const sy=seasonOf(date);if(PREG.v&&PREG.sy===sy&&Date.now()-PREG.ts<600000)return PREG.v;
-  try{const r=await fetch(`seed/pregame-${sy}.json?t=${Math.floor(Date.now()/600000)}`,{cache:'no-store'});PREG={ts:Date.now(),sy,v:r.ok?await r.json():{}};}catch(e){PREG={ts:Date.now(),sy,v:{}};}
+  try{const v=await jget(`seed/pregame-${sy}.json?t=${Math.floor(Date.now()/600000)}`);PREG={ts:Date.now(),sy,v};}catch(e){PREG={ts:Date.now(),sy,v:{}};}
   return PREG.v;
 }
 async function attachGameInfo(games,date){
