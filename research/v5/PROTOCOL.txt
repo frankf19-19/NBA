@@ -1,0 +1,25 @@
+2026-10-27 round5, fixed before outputs. Retrospective, already studied data.
+PRIMARY benchmark is fixed regress3 family trained only prior4 seasons,
+not historical switching among families. Secondary nested-current descriptive.
+Features exactly regress3 (constant, nuisance0:4,3 opponent ratings).
+Candidates: direct L1 quantile(alpha .01), Huber epsilon1.35 alpha10,
+Student-t IRLS(df5,scale14,10 iterations,ridge10); and prior3 OOF affine
+OLS recalibration, affine median recalibration, nonlinear odd residual
+recalibration with bases p,tanh(p/10),tanh(p/20),intercept, ridge100.
+Standardize using training only. Direct models train prior4 seasons;
+calibration models use previous3 OOF seasons of baseline, >=2000.
+Report all outcomes 2015-26, recent2021-26, strict past-only candidate
+selection on preceding3 years (MAE improvement .03, RMSE<=+.02,
+winner>=-.005, simplest within .01). No selection on target-year outcomes.
+Promotion requires .05 recent MAE improvement, RMSE/winner nonregression,
+5/6 improved seasons, paired-date95% CI upper<0, proper bin probabilities
+not worse using preceding3 years only. Else research-only, no automatic use.
+Diagnostics group by PREDICTED strength and days since season start,
+not by actual final margin. No future-game features; same-date states are
+from already validated feature builder. No accuracy promises from in-sample fits.
+Follow-up after diagnostics (before correction results): league-wide rolling
+home-bias intercept. Prior completed OOF residuals only, same-date batching.
+Rolling200/500 raw residual means, max365-day age, shrink n/(n+200),clip+/-2;
+EWMA half-life200 games on residuals clipped+/-25, gap>120days decay.5.
+Report all and prior3-season selector with original gates. No year-specific
+COVID flags or known-outcome overrides. Compare to fixed regress3 benchmark.
