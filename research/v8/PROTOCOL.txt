@@ -1,0 +1,45 @@
+2026-10-27 round8, specified before viewing outcomes. Retrospective only.
+Primary reference: cleaned fixed-regress3 OOF baseline from round7, plus
+reconstructed CURRENT injury rule: PPG>=6, weights1/.75/.4/.1, factor.06,
+cap7 PER TEAM. No-injury is descriptive only, not the reference to beat.
+Official PDF actual header must precede actual tip, both teams submitted,
+unique static identity aliases only, unresolved identities exclude game.
+Pregame PPG/minutes current>=5 games else priorseason>=8, no future games.
+Player coefficients use game-level minutes/48 (not stint RAPM), previous2
+seasons only, sparse ridge150, target home margin-2.3; no current-season
+player coefficients. This is predictive association, not causal player value.
+Candidates: fit nonnegative0..3 gain on missing-player coefficient*expected
+minutes/48; combined old injury plus player effect with ridge100 prior[1,0];
+attendance-incremental player effect with fitted nonnegative0..3 gain.
+Attendance=.65season+.35past10, prior1 if<5 teamgames. Team cap+/-7 for each
+candidate correction. Fit injury mapping on strictly earlier seasons min500;
+evaluate2024/25/26, include all models and annual results. No best-test choice.
+Promotion needs .05 MAE gain vs reconstructed old rule, RMSE/winner nonregress,
+>=2/3 years improve and paired-day95%CI upper<0; still requires prospective
+confirmation/full live-pipeline parity. No clinical or guaranteed accuracy claim.
+Control added before injury-mapping outcomes: fit gain on old PPG loss alone
+(nonnegative0..3, scalar SSE search step.01, same per-team cap). This separates
+benefits of relearning a coefficient from benefits of adding player information.
+Combined ridge is fitted before caps; penalty100 in standardized coordinates,
+prior original coefficients[1,0], then cap each team's correction+/-7 at inference.
+Follow-up after player-impact outcomes: official status availability study.
+Use prior-known PPG>=6 and expected minutes>=10 only, completed boxscore labels.
+Out=nonappearance label from CURRENT game is evaluation outcome only, never
+pregame feature. Future current-game minutes/points never used as predictors.
+Models: fixed status weights; status Beta counts (prior50 at fixed weight);
+status+report-age bins <=1h,1-3h,3-6h (prior100 at fitted global status);
+status+PPG role <15/>=15 (prior100 at fitted global status).
+Fit only earlier seasons; test2024-26; no best-test candidate selection.
+Report player nonappearance Brier/logloss and GAME margin MAE against same
+fixed.06/threshold/caps baseline. Official statuses only; ESPN Day-to-Day is
+not automatically equivalent. Out means no recorded appearance, not medical
+certainty. Require margin promotion gates from initial protocol before use.
+
+Label precision audit: pl is built from ESPN !didNotPlay athletes with stats;
+use presence in pl as appearance, including rounded zero-minute appearances.
+Such players count toward past GP as well. Do not infer DNP from minutes==0.
+This corrects outcome measurement before publication, without changing gates.
+
+Prospective implementation records ALL three probability estimates together.
+Primary field is simplest statusBeta50; role/age alternatives remain separate.
+No retrospective best model is promoted or used for score adjustments.

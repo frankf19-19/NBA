@@ -1002,7 +1002,7 @@ async function loadInjuries(teamIds){
   await Promise.allSettled(jobs);
   return map;
 }
-/* 狀態 → 缺陣機率權重:Out 1、Doubtful 0.75、Questionable/Day-To-Day 0.4、Probable 0.1(官方報告分級;ESPN 只有 Out/Day-To-Day) */
+/* 狀態 → 比分影響權重(不是已校準的未上場機率):Out 1、Doubtful 0.75、Questionable/Day-To-Day 0.4、Probable 0.1(官方報告分級;ESPN 只有 Out/Day-To-Day) */
 function injWeight(st){st=String(st||'');if(/out/i.test(st))return 1;if(/doubt/i.test(st))return 0.75;if(/question|day/i.test(st))return 0.4;if(/probable/i.test(st))return 0.1;return 0;}
 function injInfo(teamId,date=etToday()){
   const list=(INJ[teamId]||[]).filter(x=>(x.pts||0)>=6);

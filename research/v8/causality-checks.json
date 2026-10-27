@@ -1,0 +1,7 @@
+{
+  "priorAndSameDateFeatureRowsUnchanged": 3948,
+  "laterFeatureRowsChanged": 1135,
+  "currentSeasonLabelsDoNotChangeCurrentSeasonPredictions": true,
+  "priorSeasonLabelsDoChangeNextSeasonPredictions": true,
+  "playerCoefficientsUsePriorSeasonsOnly": true
+}

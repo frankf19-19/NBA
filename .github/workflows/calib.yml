@@ -43,6 +43,7 @@ jobs:
           node scripts/test-robust-unit.cjs
           node scripts/test-injury-identity.cjs
           node scripts/test-game-context.cjs
+          node scripts/test-availability-unit.cjs
       - name: 執行校準
         env:
           NBA_FAST_REFRESH: ${{ (github.event_name == 'push' || github.event.schedule == '10 22 * * *' || github.event.schedule == '10 0 * * *') && '1' || '0' }}
@@ -51,7 +52,7 @@ jobs:
         run: |
           git config user.name "calib-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add -A calib.json pdb.json margin-model.json quality-model.json robust-shadow.json seed
+          git add -A calib.json pdb.json margin-model.json quality-model.json robust-shadow.json availability-shadow.json seed
           git add -u
           git diff --cached --quiet && exit 0
           git commit -m "每日自動校準 $(date -u +%F)"

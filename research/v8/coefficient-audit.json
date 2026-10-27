@@ -1,0 +1,56 @@
+[
+  {
+    "season": 2021,
+    "trainingSeasons": [
+      2019,
+      2020
+    ],
+    "games": 2201,
+    "players": 624
+  },
+  {
+    "season": 2022,
+    "trainingSeasons": [
+      2020,
+      2021
+    ],
+    "games": 2051,
+    "players": 614
+  },
+  {
+    "season": 2023,
+    "trainingSeasons": [
+      2021,
+      2022
+    ],
+    "games": 2310,
+    "players": 667
+  },
+  {
+    "season": 2024,
+    "trainingSeasons": [
+      2022,
+      2023
+    ],
+    "games": 2460,
+    "players": 685
+  },
+  {
+    "season": 2025,
+    "trainingSeasons": [
+      2023,
+      2024
+    ],
+    "games": 2458,
+    "players": 637
+  },
+  {
+    "season": 2026,
+    "trainingSeasons": [
+      2024,
+      2025
+    ],
+    "games": 2456,
+    "players": 664
+  }
+]

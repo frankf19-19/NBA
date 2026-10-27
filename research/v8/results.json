@@ -1,0 +1,259 @@
+{
+  "names": [
+    "currentRule",
+    "relearnPPG",
+    "playerImpact",
+    "combined",
+    "incrementalPlayerImpact"
+  ],
+  "audit": {
+    "games": 7224,
+    "eligible": 5094,
+    "missingTeam": 388,
+    "unresolvedIdentity": 818,
+    "afterTip": 484,
+    "unsubmitted": 47,
+    "missingReport": 393
+  },
+  "folds": [
+    {
+      "season": 2024,
+      "trainN": 2734,
+      "gains": [
+        {
+          "name": "relearnPPG",
+          "gain": 1.21
+        },
+        {
+          "name": "playerImpact",
+          "gain": 0.49
+        },
+        {
+          "name": "incrementalPlayerImpact",
+          "gain": 1.39
+        }
+      ],
+      "combinedCoefficients": [
+        1.2063165480228817,
+        -0.02182681712128937
+      ],
+      "models": {
+        "currentRule": {
+          "n": 867,
+          "mae": 10.863717952852392,
+          "rmse": 13.805829978287186,
+          "winner": 0.6597462514417531
+        },
+        "relearnPPG": {
+          "n": 867,
+          "mae": 10.848672162233996,
+          "rmse": 13.796104027983134,
+          "winner": 0.6608996539792388
+        },
+        "playerImpact": {
+          "n": 867,
+          "mae": 10.986001571103044,
+          "rmse": 13.940585598734327,
+          "winner": 0.6401384083044983
+        },
+        "combined": {
+          "n": 867,
+          "mae": 10.84903982371794,
+          "rmse": 13.796369456489124,
+          "winner": 0.6620530565167243
+        },
+        "incrementalPlayerImpact": {
+          "n": 867,
+          "mae": 10.98302456796883,
+          "rmse": 13.933847465145591,
+          "winner": 0.6412918108419838
+        }
+      }
+    },
+    {
+      "season": 2025,
+      "trainN": 3601,
+      "gains": [
+        {
+          "name": "relearnPPG",
+          "gain": 1.29
+        },
+        {
+          "name": "playerImpact",
+          "gain": 0.57
+        },
+        {
+          "name": "incrementalPlayerImpact",
+          "gain": 1.43
+        }
+      ],
+      "combinedCoefficients": [
+        1.1916808078517087,
+        -0.05956614286424699
+      ],
+      "models": {
+        "currentRule": {
+          "n": 949,
+          "mae": 10.57135593001262,
+          "rmse": 13.62751746396458,
+          "winner": 0.6796628029504742
+        },
+        "relearnPPG": {
+          "n": 949,
+          "mae": 10.598007931134799,
+          "rmse": 13.6512849549943,
+          "winner": 0.6754478398314014
+        },
+        "playerImpact": {
+          "n": 949,
+          "mae": 10.73058158529158,
+          "rmse": 13.811892945468383,
+          "winner": 0.6712328767123288
+        },
+        "combined": {
+          "n": 949,
+          "mae": 10.584209487717086,
+          "rmse": 13.639106703170013,
+          "winner": 0.6765015806111696
+        },
+        "incrementalPlayerImpact": {
+          "n": 949,
+          "mae": 10.74966375315279,
+          "rmse": 13.829580238397476,
+          "winner": 0.6691253951527925
+        }
+      }
+    },
+    {
+      "season": 2026,
+      "trainN": 4550,
+      "gains": [
+        {
+          "name": "relearnPPG",
+          "gain": 1.16
+        },
+        {
+          "name": "playerImpact",
+          "gain": 0.48
+        },
+        {
+          "name": "incrementalPlayerImpact",
+          "gain": 1.14
+        }
+      ],
+      "combinedCoefficients": [
+        1.1537138965833729,
+        0.011186863442192305
+      ],
+      "models": {
+        "currentRule": {
+          "n": 544,
+          "mae": 11.179237310451038,
+          "rmse": 14.211524661758405,
+          "winner": 0.7242647058823529
+        },
+        "relearnPPG": {
+          "n": 544,
+          "mae": 11.165736460367517,
+          "rmse": 14.201477130742768,
+          "winner": 0.7279411764705882
+        },
+        "playerImpact": {
+          "n": 544,
+          "mae": 11.490878879263137,
+          "rmse": 14.573491163676636,
+          "winner": 0.7279411764705882
+        },
+        "combined": {
+          "n": 544,
+          "mae": 11.16495515774795,
+          "rmse": 14.200419593414187,
+          "winner": 0.7261029411764706
+        },
+        "incrementalPlayerImpact": {
+          "n": 544,
+          "mae": 11.486897035627536,
+          "rmse": 14.587206789586398,
+          "winner": 0.7371323529411765
+        }
+      }
+    }
+  ],
+  "test": {
+    "currentRule": {
+      "n": 2360,
+      "mae": 10.818883618470494,
+      "rmse": 13.829460098881698,
+      "winner": 0.6826271186440678
+    },
+    "relearnPPG": {
+      "n": 2360,
+      "mae": 10.820961409213444,
+      "rmse": 13.832940791601867,
+      "winner": 0.6822033898305084
+    },
+    "playerImpact": {
+      "n": 2360,
+      "mae": 10.99967093089288,
+      "rmse": 14.037936649646145,
+      "winner": 0.6728813559322034
+    },
+    "combined": {
+      "n": 2360,
+      "mae": 10.815367769839767,
+      "rmse": 13.827956252381837,
+      "winner": 0.6826271186440678
+    },
+    "incrementalPlayerImpact": {
+      "n": 2360,
+      "mae": 11.00533270743744,
+      "rmse": 14.045762893892082,
+      "winner": 0.6745762711864407
+    }
+  },
+  "noInjuryDescriptive": {
+    "n": 2360,
+    "mae": 11.007990951017904,
+    "rmse": 14.061826716968135,
+    "winner": 0.6677966101694915
+  },
+  "pairedComparisons": {
+    "relearnPPG": {
+      "maeDifference": 0.0020777907429499623,
+      "CI95": [
+        -0.01619343268861233,
+        0.020957122548561358
+      ],
+      "improvedSeasons": 2
+    },
+    "playerImpact": {
+      "maeDifference": 0.18078731242238563,
+      "CI95": [
+        0.09239506513790044,
+        0.2706130937962431
+      ],
+      "improvedSeasons": 0
+    },
+    "combined": {
+      "maeDifference": -0.0035158486307253073,
+      "CI95": [
+        -0.018485821982471184,
+        0.011423283204073882
+      ],
+      "improvedSeasons": 2
+    },
+    "incrementalPlayerImpact": {
+      "maeDifference": 0.18644908896694443,
+      "CI95": [
+        0.09773919470078739,
+        0.27996267644050654
+      ],
+      "improvedSeasons": 0
+    }
+  },
+  "reportAgeHours": [
+    0.5,
+    2.5,
+    6.0
+  ]
+}
