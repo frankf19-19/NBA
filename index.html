@@ -554,7 +554,12 @@ function liveClockTxt(g){
 
 /* ---------- 資料抓取(ESPN 公開 API) ---------- */
 async function fetchGames(date){
-  const d=await jget(`${SB}/scoreboard?dates=${dkey(date)}`);
+  /* ESPN 的 CDN 偶爾會把某一天的網址快取成壞掉的回應(瀏覽器顯示 Failed to fetch),換幾種等價網址依序試 */
+  let d=null,lastErr=null;
+  for(const u of [`${SB}/scoreboard?dates=${dkey(date)}&limit=100`,`${SB}/scoreboard?limit=50&dates=${dkey(date)}`,`${SB}/scoreboard?dates=${dkey(date)}`]){
+    try{d=await jget(u);break;}catch(e){lastErr=e;}
+  }
+  if(!d)throw lastErr||new Error('讀不到賽程');
   const out=[];
   (d.events||[]).forEach(ev=>{
     const c=(ev.competitions||[])[0]||{};
