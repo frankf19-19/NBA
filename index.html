@@ -350,7 +350,7 @@
   .date-note{font-size:12px;color:var(--muted);margin:0 0 8px}
   :focus-visible{outline:3px solid var(--teal);outline-offset:4px}
   button,input,select{min-height:40px}
-  .game{content-visibility:auto;contain-intrinsic-size:auto 440px}
+  /* 不用 content-visibility:畫面外的比賽卡會先用 440px 佔位、捲到時才變成實際高度(約 880px),造成頁面一直跳 */
   .sec-head[role=button]{border-radius:6px}
   @media(max-width:600px){.nav,.today-btn,.theme-b{min-height:44px}h1{font-size:30px}.datebar{gap:8px}.score-row{gap:14px}}
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
