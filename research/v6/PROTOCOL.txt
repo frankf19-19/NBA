@@ -1,0 +1,20 @@
+2026-10-27 round6 matchup study, fixed before viewing outputs.
+Primary reference: fixed regress3 family, refit using previous4 seasons.
+Retrospective on already-examined outcomes, NOT fresh blind evaluation.
+Eight per-team offensive and allowed historical descriptors: eFG,3PA/FGA,
+FTM/FGA,TOV/poss,OREB share,pace,2P%,3P%. EWMA rate.05, offseason retain.65;
+20 pseudo-games of previous-season league rates; full previous season league
+rates are allowed, current/future season aggregates never used as priors.
+Subtract old league priors before interaction products. Features: home-away
+own and allowed vectors, plus homeOwn*awayAllowed-awayOwn*homeAllowed.
+Daily batching. Missing box data updates neither descriptor nor league.
+Candidates: current; additive styles; interaction only; both; both plus
+mean pace interaction with three strength ratings; shallow absolute-error
+boosting (150 iter,7 leaves,depth3,learning.05,minleaf100,l2=50,no earlystop).
+Ridge core10, new descriptors100 after past-training standardization.
+Fit prior4 seasons. Prior3 OOF selection: improve MAE .03, RMSE<=+.02,
+winner>=-.005; simplest within .01. Evaluate2015-26; recent2021-26 primary.
+Gate to contemplate adoption: MAE gain .05,RMSE/winner nonregression,5/6
+improved years,paired-date CI upper<0,proper bin probabilities nonregression.
+No cherry-picked test-year or changing official coefficients without evidence.
+Verify future and same-day outcome perturbations cannot change earlier features.

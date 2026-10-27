@@ -618,7 +618,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       W.__inj=await W.loadInjuries(ids);E('INJ=window.__inj;INJ_READY=true');
       let officialForDate=null;
       {const md=`${d.slice(5,7)}/${d.slice(8,10)}/${d.slice(0,4)}`;const rowsD=INJOFF.filter(r=>r.d===md);
-        if(rowsD.length){W.__injOff=rowsD;const nOff=E('applyOfficialInjuries(window.__injOff)');if(nOff>0)officialForDate=INJOFF_META;dlog(`官方傷兵報告套用 ${d}:${nOff}/${rowsD.length} 筆(含 Doubtful/Questionable/Probable 分級)`);}}
+        if(rowsD.length){W.__injOff=rowsD;const nOff=E('applyOfficialInjuries(window.__injOff)');if(nOff>0)officialForDate={...INJOFF_META,matching:E('applyOfficialInjuries.audit')};dlog(`官方傷兵報告套用 ${d}:${nOff}/${rowsD.length} 筆(含 Doubtful/Questionable/Probable 分級)`);}}
       setCur(d);
       for(const g of live){
         let hw=0,aw=0;(seas[ids.indexOf(g.homeId)]||[]).forEach(r=>{if(r.done&&r.oppId===g.awayId&&r.pf!=null&&r.date<d){if(r.won)hw++;else aw++;}});
@@ -634,7 +634,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         const robustPoint=p.qualityVersion?Robust.forecast(robustArtifact,g,p.f,d):null;
         const robustShadow=robustPoint?{...robustPoint,pointOnly:robustPoint.margin,margin:robustPoint.margin+ih.adj-ia.adj,candidates:robustPoint.candidates.map(v=>v+ih.adj-ia.adj)}:null;
         PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),mm:+p.raw_margin.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
-          robustShadow,injOfficial:officialForDate?{publishedAt:officialForDate.publishedAt,url:officialForDate.url}:null,hn:ih.names,an:ia.names,p:p.home_prob,mb:p.mb,mbp:p.mbp,qv:p.qualityVersion,qn:p.qualityName,baseMargin:p.baseMargin,injAlt:p.injuryAlternativeMargin,q:p.mbProbs,interval:p.marginInterval??null,shadow:p.shadow??null,mv:p.distributionVersion??null,tip:g.startISO,mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
+          robustShadow,injOfficial:officialForDate?{publishedAt:officialForDate.publishedAt,url:officialForDate.url,matching:officialForDate.matching}:null,hn:ih.names,an:ia.names,p:p.home_prob,mb:p.mb,mbp:p.mbp,qv:p.qualityVersion,qn:p.qualityName,baseMargin:p.baseMargin,injAlt:p.injuryAlternativeMargin,q:p.mbProbs,interval:p.marginInterval??null,shadow:p.shadow??null,mv:p.distributionVersion??null,tip:g.startISO,mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
           bpi:(bp&&!bp.x)?bp.pd:null,bpiP:(bp&&!bp.x)?bp.hp:null,
           k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString(),u:2};preN++;
       }

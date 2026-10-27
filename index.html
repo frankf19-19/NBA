@@ -458,7 +458,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.2.0 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.2.1 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script src="scripts/margin-model.js?v=1"></script>
@@ -1021,20 +1021,28 @@ function injInfo(teamId,date=etToday()){
   return {adj:+Math.max(-7,adj).toFixed(1),names:names.slice(0,4),incrementalAdj:incrementalAdj==null?null:+Math.max(-7,Math.min(7,incrementalAdj)).toFixed(2)};   /* 上限 −7 分(資料到缺 55 ppg 都還是線性,三名主力同缺約 −4.6) */
 }
 /* NBA 官方傷兵報告(雲端每天解析 PDF 後注入):以官方狀態覆寫/補上 ESPN 名單;球隊以去空白全名比對,球員以姓名比對球員資料庫 */
-const nameKey=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
+const nameKey=n=>String(n||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z]/g,'');
+const officialNameAliases=Object.freeze({nicolasclaxton:'nicclaxton',kenyonmartin:'kjmartin'});
+const playerNameKey=n=>{const k=nameKey(String(n||'').replace(/\b(?:jr|sr|ii|iii|iv)\b\.?/gi,'').replace(/(?:Jr|Sr|III|II|IV)\.?\s*$/,''));return Object.hasOwn(officialNameAliases,k)?officialNameAliases[k]:k;};
+const officialTeamKey=n=>nameKey(n).replace(/^losangeles/,'la');
 function applyOfficialInjuries(rows){
+  const audit={version:'official-identity-v1',applied:0,matchedPlayers:0,unknownPlayers:0,ambiguousPlayers:0,unknownTeams:0,invalidStatuses:0};applyOfficialInjuries.audit=audit;
   if(!Array.isArray(rows)||!rows.length)return 0;
-  const tidByName={};Object.values(PDB.teams||{}).forEach(t=>{tidByName[nameKey(t.n)]=t.id;});
-  const pidByName={};Object.values(PDB.players||{}).forEach(p=>{pidByName[nameKey(p.n)]=p;});
-  let n=0;
-  rows.forEach(r=>{const tid=tidByName[nameKey(r.team)];if(!tid)return;
-    const k=nameKey(r.p);let p=pidByName[k];
-    if(!p){const parts=r.p.split(' ');const alt=nameKey(parts[0]+parts[parts.length-1]);p=Object.values(PDB.players).find(x=>x.tid===tid&&(nameKey(x.n)===alt||nameKey(x.n).startsWith(alt)));}
-    const list=INJ[tid]=INJ[tid]||[];
-    const ex=list.find(x=>(p&&x.id===p.id)||nameKey(x.name)===k);
-    if(ex){ex.status=r.s;ex.off=1;}else list.push({id:p?+p.id:0,name:p?p.n:r.p,status:r.s,pts:p&&p.pts!=null?p.pts:0,off:1});
-    n++;});
-  return n;
+  const tidByName=Object.create(null);Object.values(PDB.teams||{}).forEach(t=>{tidByName[officialTeamKey(t.n)]=+t.id;});
+  const players=Object.values(PDB.players||{}),allowed=new Set(['Out','Doubtful','Questionable','Probable','Available']);
+  const unique=(pool,name,field)=>{const exact=pool.filter(x=>nameKey(x[field])===nameKey(name)),matches=exact.length?exact:pool.filter(x=>playerNameKey(x[field])===playerNameKey(name));return {value:matches.length===1?matches[0]:null,ambiguous:matches.length>1};};
+  rows.forEach(r=>{
+    if(!allowed.has(r.s)){audit.invalidStatuses++;return;}
+    const tid=tidByName[officialTeamKey(r.team)];if(!tid){audit.unknownTeams++;return;}
+    // Resolve within this team's roster only; never use prefix/fuzzy matches.
+    const found=unique(players.filter(p=>+p.tid===tid),r.p,'n');if(found.ambiguous){audit.ambiguousPlayers++;return;}const p=found.value;
+    const list=INJ[tid]||[],byId=p?list.filter(x=>+x.id===+p.id):[];
+    const existing=byId.length?{value:byId.length===1?byId[0]:null,ambiguous:byId.length>1}:unique(list,r.p,'name');
+    if(existing.ambiguous){audit.ambiguousPlayers++;return;}const ex=existing.value;
+    if(ex){ex.status=r.s;ex.off=1;}else{INJ[tid]=list;list.push({id:p?+p.id:0,name:p?p.n:r.p,status:r.s,pts:p&&p.pts!=null?p.pts:0,off:1});}
+    audit.applied++;if(p||ex)audit.matchedPlayers++;else audit.unknownPlayers++;
+  });
+  return audit.applied;
 }
 
 /* 逐隊偏差修正:從預測紀錄簿(真實賽果)回看模型近期對該隊的系統性高低估,含阻尼與上限。
@@ -2151,7 +2159,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大，請以獨立期間的分差誤差與機率校準評估。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.2.0 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大，請以獨立期間的分差誤差與機率校準評估。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.2.1 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -2718,3 +2726,4 @@ if(!window.__CLOUD_BUILD){
 </script>
 </body>
 </html>
+
