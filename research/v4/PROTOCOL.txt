@@ -1,0 +1,20 @@
+2026-10-27 fourth retrospective study, fixed before its outputs.
+Use existing v3.2 historical OOF baseline. No new blind test is claimed.
+Fixed candidates: residual cap15; smooth tanh residual scale20;
+early season learning rate multiplied2 in first10 team games;
+calendar gap decay exp(-gap/90); pace-normalized margin to100 possessions;
+all-shot regression (including two-pointers) with residual cap20.
+Three rates .04/.08/.12, offseason carry .65, same-day batch updates.
+Training previous4 seasons ridge10, same nuisance covariates as regress3.
+Selection on previous3 OOF years only, MAE improvement .05, RMSE no worse
++.02, winner no worse -.005, simplest within .02. Test 2015-2026; report
+recent2021-26. Promotion: recent MAE>=.05 better, RMSE/winner nonregression,
+>=5/6 years improved and paired-day bootstrap95% CI upper<0. All candidates
+and cohort results reported, including failures. No test-season selection.
+Follow-up ensemble hypothesis fixed after viewing single-family results:
+add uniform mean of six candidates (fixed weights); half baseline/half uniform;
+and a constrained past-three-year OOF quadratic blend of seven models.
+Weights nonnegative, sum<=1 for deviations from baseline, penalty100 toward
+baseline, previous three years only, min2000. No test-year weight fitting.
+Report these separately; do not choose highest retrospective performance and
+claim a fresh blind win. Same promotion gate as first study (>=.05,5/6,CI).

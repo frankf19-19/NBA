@@ -29,7 +29,7 @@ function vector(s,e){
  const age=days(s.first[e.sy]||e.d,e.d),base=[1,e.f.b,...e.f.x];base[5]=fatigue(h)-fatigue(a);
  return base.concat(age<14?e.f.b:0,age>=14&&age<30?e.f.b:0,...diff[0],...diff[1],...diff[2],...net,(fs[0][0][4]+fs[1][0][4])/2,Math.abs(diff[0][0]),age/180);
 }
-function featureRows(entries){
+function featureRows(entries,{observations=false}={}){
  const s=initial(),rows=[];let usable=0;
  for(let i=0;i<entries.length;){
   let end=i+1;while(end<entries.length&&entries[end].d===entries[i].d)end++;
@@ -47,6 +47,7 @@ function featureRows(entries){
     };
     const hp=expected(h,a),ap=expected(a,h);adj3=3*(hp[1]*H[3]-H[2])+(hp[2]*H[5]-H[4])-3*(ap[1]*A[3]-A[2])-(ap[2]*A[5]-A[4]);adjAll=adj3+2*(hp[0]*H[1]-H[0])-2*(ap[0]*A[1]-A[0]);staged.push({h,a,H,A});
    }
+   if(observations)rows[rows.length-1].noise=[adj3,adjAll];
    [e.am,e.am+.5*adj3,e.am+.5*adjAll].forEach((target,k)=>RATES.forEach((rate,r)=>{const diff=s.ratings[k][r][h]-s.ratings[k][r][a],v=rate*clamp(target-(2.3+diff),-35,35);delta[k][r][h]+=v;delta[k][r][a]-=v;}));
   }
   s.ratings.forEach((A,k)=>A.forEach((r,j)=>r.forEach((v,t)=>r[t]=v+delta[k][j][t])));

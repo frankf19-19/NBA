@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),R=require('./robust-model.cjs'),Q=require('./quality-model.js');
+const e=(id,d,h,a,y)=>({id,d,sy:2027,hid:h,aid:a,am:y,f:{b:1,x:Array(7).fill(0)}});
+const games=[e('1','2026-10-20',1,2,20),e('2','2026-10-21',1,3,-10),e('3','2026-10-21',4,1,30),e('4','2026-10-22',2,1,2)];
+const a=R.featureRows(games),b=R.featureRows([...games,e('5','2026-10-24',2,1,100)]);assert.deepEqual(a.rows.map(r=>r.x),b.rows.slice(0,4).map(r=>r.x));
+const changed=R.featureRows(games.map(g=>g.id==='2'?{...g,am:150}:g));assert.deepEqual(a.rows[2].x,changed.rows[2].x);assert.notDeepEqual(a.rows[3].x,changed.rows[3].x);
+assert.deepEqual(Q.featureRows(games).rows.map(r=>r.x),Q.featureRows(games,{observations:true}).rows.map(r=>r.x));assert(!Q.featureRows(games).rows[0].noise);
+const model={schema:1,version:R.VERSION,mode:'shadow',pointEnabled:false,season:2027,trainedThrough:'2026-10-22',coeff:Array.from({length:6},()=>[1,0,0,0,0,0,0,0]),state:a.state,qualityState:a.qualityState},g={homeId:1,awayId:2},f=games[0].f;
+const frozen=JSON.stringify(model);assert.equal(R.forecast(model,g,f,'2026-10-23').margin,1);assert.equal(JSON.stringify(model),frozen);
+for(const date of ['2026-10-22','2026-10-24','2027-10-23','bad'])assert.equal(R.forecast(model,g,f,date),null);
+assert.equal(R.forecast({...model,pointEnabled:true},g,f,'2026-10-23'),null);assert.equal(R.forecast(model,{homeId:99,awayId:2},f,'2026-10-23'),null);assert.equal(R.forecast(model,g,{...f,b:NaN},'2026-10-23'),null);
+const pg={at:'2026-10-23T20:00Z',tip:'2026-10-23T21:00Z',mm:1,robustShadow:{version:R.VERSION,margin:2}};assert.equal(R.score([{...games[0],pg}]).n,1);assert.equal(R.score([{...games[0],pg:{...pg,at:'2026-10-23T22:00Z'}}]).n,0);
+console.log('Robust shadow checks passed: causal/same-day batching, strict freshness, finite input, immutable state, never enabled, true pregame scores.');
