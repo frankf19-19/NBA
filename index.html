@@ -344,6 +344,7 @@
   }
   @media (prefers-reduced-motion:no-preference){
     .game,.player,.headline{animation:rise .4s ease both}
+    .norise .game,.norise .headline{animation:none}   /* 自動更新時不重播進場動畫 */
     @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   }
   .date-note{font-size:12px;color:var(--muted);margin:0 0 8px}
@@ -1388,10 +1389,10 @@ function gameCard(g,p,rv){
       <div class="mbfoot">機率前三項：${alternatives}（合計 ${Math.round(ranked.reduce((a,b)=>a+b.v,0)*100)}%，不是單一預測命中率）</div>${uncertainty}
       <div class="mbfoot">${esc(favName)} 各區間機率(${source});${esc(favHome?g.away:g.home)} 爆冷獲勝合計 ${Math.round(upset*100)}%${rv&&ai!=null&&!rv.mbHit?` · 實際落在「${esc((ai<6)===favHome?favName:(favHome?g.away:g.home))} 贏 ${MB_NAMES[ai%6]}」`:''}</div></div>`;
   }
-  return `<div class="game ${isFinal?'done':''}">
+  return `<div class="game ${isFinal?'done':''}" data-game="${g.id}">
     <div class="g-top">${teamsHtml}${pill}${gdayBtn}</div>
     ${meta?`<div class="meta">${meta}</div>`:''}
-    <div class="meta" id="h2h-${g.id}"></div>
+    <div class="meta" id="h2h-${g.id}" style="min-height:1.6em"></div>
     ${styleHtml(g,$('datePick').value)}
     <div class="meta"><button class="gday h2hbtn" data-h2h="${g.id}">歷年對戰紀錄 ▸</button></div><div class="h2hbox" id="h2hbox-${g.id}"></div>
     ${liveRow}
@@ -1435,6 +1436,20 @@ function buildHeadlines(date,games,preds,reviews){
 }
 
 let refreshTimer=null;
+let GAME_ORDER={date:null,ids:[]};
+function captureView(){
+  const cards=[...document.querySelectorAll('#games .game[data-game]')];
+  const top=cards.find(c=>c.getBoundingClientRect().bottom>60);
+  return {anchor:top?top.dataset.game:null,offset:top?top.getBoundingClientRect().top:0,
+    h2hOpen:[...document.querySelectorAll('#games .h2hbox')].filter(b=>b.innerHTML).map(b=>b.id.replace('h2hbox-','')),
+    whyOpen:[...document.querySelectorAll('#games .why.reason')].filter(w=>w.dataset.clamp&&!w.classList.contains('clamp')).map(w=>w.closest('.game')?.dataset.game).filter(Boolean)};
+}
+function restoreView(k){
+  k.whyOpen.forEach(id=>{const w=document.querySelector(`#games .game[data-game="${id}"] .why.reason`);if(w){w.dataset.clamp='1';w.classList.remove('clamp');}});
+  k.h2hOpen.forEach(id=>{const g=curGames.find(x=>String(x.id)===id),box=$('h2hbox-'+id),btn=document.querySelector(`#games .h2hbtn[data-h2h="${id}"]`);
+    if(g&&box&&H2H){btn&&(btn.textContent='歷年對戰紀錄 ▾');showH2H(box,g,$('datePick').value);}});
+  if(k.anchor){const c=document.querySelector(`#games .game[data-game="${k.anchor}"]`);if(c){const d=c.getBoundingClientRect().top-k.offset;if(Math.abs(d)>1)window.scrollBy(0,d);}}
+}
 function buildDailySummary(date,games,preds,reviews,acc){
   const parts=[];
   const done=reviews.filter(Boolean);
@@ -1516,7 +1531,10 @@ async function loadDay(quiet){
       g._h2h={hw,aw};});
     // 排序:進行中 → 未開打 → 已完賽
     const wgt=g=>g.status==='Live'?0:(g.status==='Final'?2:1);
-    games.sort((a,b)=>wgt(a)-wgt(b));
+    /* 自動更新時維持畫面上原本的順序(比賽打完不會突然跳到下面),手動載入才重新排序 */
+    if(quiet&&GAME_ORDER.date===date&&GAME_ORDER.ids.length){const pos=id=>{const i=GAME_ORDER.ids.indexOf(String(id));return i<0?999:i;};games.sort((a,b)=>pos(a.id)-pos(b.id));}
+    else games.sort((a,b)=>wgt(a)-wgt(b));
+    GAME_ORDER={date,ids:games.map(g=>String(g.id))};
     let hits=0,finals=0,errSum=0,errN=0,fulls=0,mbN=0,frozenFinals=0,html='';
     const reviews=[];curGames=games;curPreds=[];
     games.forEach(g=>{
@@ -1536,6 +1554,9 @@ async function loadDay(quiet){
         if(p.raw_margin!=null){errSum+=Math.abs(rv.actMargin-p.raw_margin);errN++;}}}
       reviews.push(rv);html+=gameCard(g,p,rv);
     });
+    /* 重畫前記住:畫面上方第一張比賽卡的位置、展開中的對戰紀錄與預測理由;重畫後還原,畫面不跳 */
+    const keep=quiet?captureView():null;
+    $('games').classList.toggle('norise',quiet);$('headlines').classList.toggle('norise',quiet);
     $('games').innerHTML=html||`<div class="empty">${date} 沒有排定的比賽(可能為休賽季、全明星週或休兵日)。<br>NBA 例行賽約為每年 10 月下旬至隔年 4 月、季後賽至 6 月,可切換日期回顧過往賽事與預測回測。</div>`;
     $('listTitle').textContent=date+' 比賽';
     $('listTag').textContent=games.length?games.length+' 場'+(finals?` · 賽前存證 ${frozenFinals} / 歷史重建 ${finals-frozenFinals}`:''):'';
@@ -1562,6 +1583,7 @@ async function loadDay(quiet){
     const summary=buildDailySummary(date,games,curPreds,reviews,{hits,errSum,errN,fulls,mbN});
     $('aiText').textContent=summary;
     $('aiSec').classList.toggle('hidden',!summary);
+    if(keep)restoreView(keep);   /* 上方所有區塊都更新完才還原位置 */
   }catch(e){if(requestId!==dayRequestId)return;st.className='status err';st.textContent='載入失敗:'+e.message;
     if(!quiet)$('games').innerHTML=`<div class="empty">讀取不到資料,請確認網路後再試。</div>`;}
   finally{if(requestId===dayRequestId){$('games').setAttribute('aria-busy','false');btn.disabled=false;btn.classList.remove('spin');}}
