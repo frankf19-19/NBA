@@ -19,6 +19,7 @@
 const fs=require('fs');
 const path=require('path');
 const Margin=require('./margin-model.js');
+const GameContext=require('./game-context.js');
 const Quality=require('./quality-model.js');
 const Robust=require('./robust-model.cjs');
 const InjuryTime=require('./injury-report-time.cjs');
@@ -67,7 +68,7 @@ const readJSON=(f,d)=>{try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch(e
 function etToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function shiftDate(d,n){const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
 const verifiedPregame=e=>!!(e.pg&&e.pg.at&&(e.pg.tip||e.tip)&&Date.parse(e.pg.at)<Date.parse(e.pg.tip||e.tip));
-const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;if(e.mbp!=null)o.mbp=e.mbp;}if(e.pg)o.pg=e.pg;if(e.tip)o.tip=e.tip;if(e.mm!=null)o.mm=e.mm;if(e.mk!=null)o.mk=e.mk;if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.nm)o.nm=1;return o;};
+const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;if(e.mbp!=null)o.mbp=e.mbp;}if(e.pg)o.pg=e.pg;if(e.tip)o.tip=e.tip;if(e.mm!=null)o.mm=e.mm;if(e.mk!=null)o.mk=e.mk;if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.cf)o.cf=1;if(e.nm)o.nm=1;return o;};
 /* 依日期插入(保持紀錄簿時間順序,逐隊偏差才不會看錯場次) */
 function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+hi)>>1;if(arr[mid].d<=e.d)lo=mid+1;else hi=mid;}arr.splice(lo,0,e);}
 
@@ -104,6 +105,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       if(e.hs==null&&e.ts&&e.ts.h&&e.ts.a){e.hs=e.ts.h[0];e.as=e.ts.a[0];}   /* 終場比分:舊資料由球隊數據補回 */
       if(e.gi&&!e.giT){delete e.gi;}   /* 舊版在賽後很久才擷取的「賽前傷兵」其實是現在的名單,不可信,移除 */
       if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1]){e.sy=2020;e.nu=1;}
+      Object.assign(e,GameContext.ledgerFlags(e));
       const gk=e.d+'|'+e.hid+'|'+e.aid;   /* ESPN 偶有同一場比賽登錄兩次(不同編號),同日同主客組合只留一筆 */
       if(seenKey.has(gk)){fixed++;continue;}
       seenKey.add(gk);seen.add(e.id);out.push(e);}
@@ -117,7 +119,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   vc.on('jsdomError',e=>{if(!/Not implemented/.test(String(e&&e.message)))console.error('[jsdom]',e.message);});
   const dom=new JSDOM(html,{runScripts:'dangerously',url:'https://frankf19-19.github.io/NBA/',virtualConsole:vc,
     beforeParse(w){
-      w.__CLOUD_BUILD=true;w.NBAMargin=Margin;w.NBAQuality=Quality;
+      w.__CLOUD_BUILD=true;w.NBAMargin=Margin;w.NBAQuality=Quality;w.NBAGameContext=GameContext;
       w.HTMLCanvasElement.prototype.getContext=()=>({clearRect(){},beginPath(){},arc(){},fill(){},stroke(){},moveTo(){},lineTo(){},fillRect(){},
         createRadialGradient:()=>({addColorStop(){}}),createLinearGradient:()=>({addColorStop(){}}),ellipse(){}});
       w.matchMedia=()=>({matches:true,addListener(){},removeListener(){}});
@@ -220,7 +222,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       try{
         setCur(d);
         const r=await W.samplesForDate(d);
-        for(const x of r.samples){const ex=byId.get(String(x.id));if(ex&&!ex.f&&x.f){ex.f=JSON.parse(JSON.stringify(x.f));fAdded++;}}
+        for(const x of r.samples){const ex=byId.get(String(x.id));if(ex){if(x.nu)ex.nu=1;if(x.cf)ex.cf=1;if(!ex.f&&x.f){ex.f=JSON.parse(JSON.stringify(x.f));fAdded++;}}}
         const fresh=[...r.samples].filter(x=>x.st!==1&&(x.sy||sy)===sy&&!have.has(String(x.id))&&!haveKey.has(x.d+'|'+x.hid+'|'+x.aid)).map(x=>{
           const e={id:String(x.id),d:x.d,sy:x.sy||sy,aw:x.aw,hm:x.hm,hid:x.hid,aid:x.aid,st:x.st,po:x.po?1:0,
             m:+(+x.m).toFixed(2),am:x.actM,hit:x.nm?null:(((x.m>=0)===x.homeWon)?1:0)};
@@ -231,7 +233,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           if(mk!=null)e.mk=mk;if(mm!=null){e.mm=mm;e.hf=((mm>=0)===x.homeWon)?1:0;}   /* 當時盤口線、最終分差(分)、最終預測是否命中,凍結 */
           if(useP)e.pgu=1;
           if(pg0&&pg0.bpi!=null)e.bpi={hp:pg0.bpiP??null,pd:+pg0.bpi,lm:pg0.at,pre:1};   /* 開打前記到的 BPI,優先於賽後回補的版本 */
-          if(x.nm)e.nm=1;
+          if(x.nm)e.nm=1;if(x.nu)e.nu=1;if(x.cf)e.cf=1;Object.assign(e,GameContext.ledgerFlags(e));
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           if(x.hs!=null){e.hs=x.hs;e.as=x.as;}

@@ -1,0 +1,30 @@
+2026-10-27 round7, locked before predictive outcomes. Already studied
+historical outcomes, no new blind claim. PRIMARY fixed regress3 prior4 seasons.
+Use recorded arena, not nominal home city, with explicit historic aliases.
+City center rounded coordinates are modeling approximations; great-circle
+previous-game-to-current-site distance is NOT observed flight itinerary.
+IANA offsets at current tip for BOTH cities, including Arizona and DST.
+Neutral/foreign/atypical target sites and unknown previous venues -> baseline
+fallback. Toronto/Tampa and NO/OKC historical home exceptions explicitly known.
+No long-gap itinerary assumed: travel=0 when >7 days; only games before
+current date enter previous venue, OT periods and schedule load. Day batching.
+Features: restdays, hours between starts, pastOT/rest and OT on B2B,
+prior7/14 gamecounts, consecutiveaway count, returninghome; distance,
+distance/rest, timezone east/west/absolute, <22h between starts,
+timezone/rest, distance on B2B; Denver and Utah home indicators, visitor
+arrival from non-altitude site, Denver/Utah visitorB2B. Not causal estimates.
+Candidates: current; density; travel; altitude; all; all+30 home-team effects.
+Ridge core10 and extras100, standardize prior-training only, previous4 years.
+Previous3 OOF selection .03 MAE gain,RMSE<=+.02,winner>=-.005,simplestwithin.01.
+Evaluate2015-26, primary2021-26 ALL games with explicit baseline fallback.
+Also report eligible cohort coverage. Promotion requires .05MAE,5/6seasons,
+RMSE/winner nonregression,paired-day CI upper<0,proper bin scores nonregression.
+Retain all failures. No updating historical frozen forecasts.
+Follow-up after inspecting venue metadata: domain classification correction,
+independent of score/error. Nine verified Las Vegas Cup games are neutral;
+three championships are outside regular-season statistics. Shared scoreboard
+context + historical overrides, classification metadata only, frozen scores
+unchanged. Separate physical workload calendar so excluded games still affect
+rest/3-in-4. Refit current quality model without altering selection thresholds.
+Rebuild fixed-family reference and repeat travel comparison on clean 7224
+recent games. These results must not be compared to old7233 as accuracy gains.

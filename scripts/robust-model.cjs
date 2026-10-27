@@ -1,7 +1,7 @@
 /* Experimental point forecasts: cloud shadow records only. Never enables itself. */
 'use strict';
-const M=require('./margin-model'),Q=require('./quality-model');
-const VERSION='robust-shadow-v1',NAMES=['cap15','smooth20','earlyFast','gapDecay90','pace100','allShotsCap20'],RATES=[.04,.08,.12];
+const M=require('./margin-model'),Q=require('./quality-model'),GameContext=require('./game-context');
+const VERSION='robust-shadow-v2',NAMES=['cap15','smooth20','earlyFast','gapDecay90','pace100','allShotsCap20'],RATES=[.04,.08,.12];
 const zeros=n=>Array(n).fill(0),cube=()=>NAMES.map(()=>RATES.map(()=>zeros(31))),days=(a,b)=>(Date.parse(b+'T12:00Z')-Date.parse(a+'T12:00Z'))/864e5,clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),dot=(a,b)=>a.reduce((s,v,k)=>s+v*b[k],0);
 function initial(){return {season:null,ratings:cube(),games:zeros(31),last:{}};}
 function prepare(s,season,date,teams){
@@ -9,8 +9,8 @@ function prepare(s,season,date,teams){
  for(const tid of new Set(teams)){const gap=s.last[tid]?days(s.last[tid],date):0;s.ratings[3].forEach(r=>r[tid]*=Math.exp(-gap/90));}
 }
 function vector(s,e,x){const pace=x[24]>70&&x[24]<130?x[24]:100;return s.ratings.map((A,k)=>[... [0,2,3,4,5].map(j=>x[j]),...A.map(r=>(r[e.hid]-r[e.aid])*(k===4?pace/100:1))]);}
-function featureRows(entries){
- const quality=Q.featureRows(entries,{observations:true}),rows=[],s=initial(),qr=quality.rows;
+function featureRows(entries,{calendar=null}={}){
+ const quality=Q.featureRows(entries,{observations:true,calendar}),rows=[],s=initial(),qr=quality.rows;
  for(let i=0;i<qr.length;){let end=i+1;while(end<qr.length&&qr[end].e.d===qr[i].e.d)end++;
   const d=qr[i].e.d,sy=qr[i].e.sy;prepare(s,sy,d,qr.slice(i,end).flatMap(r=>[r.e.hid,r.e.aid]));const delta=cube();
   for(let j=i;j<end;j++){
@@ -34,9 +34,9 @@ function score(entries){
 function build(entries,{cutoff,season}={}){
  if(!/^\d{4}-\d\d-\d\d$/.test(cutoff||''))return null;
  const data=M.clean(entries,cutoff);if(data.length<12000)return null;season=season||+cutoff.slice(0,4)+(+cutoff.slice(5,7)>=8?1:0);
- const f=featureRows(data),train=f.rows.filter(r=>r.e.sy>=season-4&&r.e.sy<season);if(train.length<2000)return null;
+ const f=featureRows(data,{calendar:GameContext.workload(entries,cutoff)}),train=f.rows.filter(r=>r.e.sy>=season-4&&r.e.sy<season);if(train.length<2000)return null;
  const coeff=NAMES.map((_,k)=>M.ridge(train.map(r=>({x:r.x[k],y:r.y}))));if(coeff.some(c=>!c||!c.every(Number.isFinite)))return null;
- return {schema:1,version:VERSION,mode:'shadow',pointEnabled:false,season,trainedThrough:data[data.length-1].d,names:NAMES,coeff,state:f.state,qualityState:f.qualityState,trainN:train.length,config:{weights:NAMES.map(()=>1/6),trainSeasons:4,carry:.65,rates:RATES},prospective:score(entries)};
+ return {schema:1,version:VERSION,mode:'shadow',pointEnabled:false,season,trainedThrough:f.qualityState.through,names:NAMES,coeff,state:f.state,qualityState:f.qualityState,trainN:train.length,config:{contextVersion:GameContext.VERSION,workloadCalendar:true,weights:NAMES.map(()=>1/6),trainSeasons:4,carry:.65,rates:RATES},prospective:score(entries)};
 }
 function forecast(model,g,f,date){
  if(!model||model.schema!==1||model.version!==VERSION||model.mode!=='shadow'||model.pointEnabled!==false||!model.state||!model.qualityState||!Array.isArray(model.coeff)||model.coeff.length!==6||!/^\d{4}-\d\d-\d\d$/.test(date||'')||!(date>model.trainedThrough&&days(model.trainedThrough,date)<=1)||model.season!==+date.slice(0,4)+(+date.slice(5,7)>=8?1:0)||![g.homeId,g.awayId].every(t=>Number.isInteger(t)&&t>=1&&t<=30)||g.homeId===g.awayId||!f||!Number.isFinite(f.b)||!Array.isArray(f.x)||f.x.length!==7||!f.x.every(Number.isFinite))return null;

@@ -1,5 +1,5 @@
 /* Causal shot-quality point-margin model. Pure JavaScript, shared by cloud and browser. */
-(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./margin-model'));else root.NBAQuality=factory(root.NBAMargin);})(typeof globalThis!=='undefined'?globalThis:this,function(M){
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./margin-model'),require('./game-context'));else root.NBAQuality=factory(root.NBAMargin,root.NBAGameContext);})(typeof globalThis!=='undefined'?globalThis:this,function(M,GameContext){
 'use strict';
 const VERSION='quality-v1',RATES=[.04,.08,.12],NAMES=['incumbent','raw','regress3','regressAll','fourFactors','combined'];
 const COLS=[null,[0,2,3,4,5,11,12,13],[0,2,3,4,5,14,15,16],[0,2,3,4,5,17,18,19],[0,1,2,3,4,5,6,7,8,20,21,22,23,24],Array.from({length:27},(_,i)=>i)];
@@ -29,11 +29,13 @@ function vector(s,e){
  const age=days(s.first[e.sy]||e.d,e.d),base=[1,e.f.b,...e.f.x];base[5]=fatigue(h)-fatigue(a);
  return base.concat(age<14?e.f.b:0,age>=14&&age<30?e.f.b:0,...diff[0],...diff[1],...diff[2],...net,(fs[0][0][4]+fs[1][0][4])/2,Math.abs(diff[0][0]),age/180);
 }
-function featureRows(entries,{observations=false}={}){
- const s=initial(),rows=[];let usable=0;
+function featureRows(entries,{observations=false,calendar=null}={}){
+ const s=initial(),rows=[];let usable=0,calendarIndex=0;
+ const record=c=>{if(c.sy!==s.season)return false;for(const tid of [c.hid,c.aid]){s.lastDates[tid].push(c.d);if(s.lastDates[tid].length>4)s.lastDates[tid].shift();}return true;};
  for(let i=0;i<entries.length;){
   let end=i+1;while(end<entries.length&&entries[end].d===entries[i].d)end++;
   const date=entries[i].d,sy=entries[i].sy;if(sy!==s.season)newSeason(s,sy,date);
+  if(calendar)while(calendarIndex<calendar.length&&calendar[calendarIndex].d<date)record(calendar[calendarIndex++]);
   const delta=tensor(3,3,31),staged=[];
   const lg=[s.prevLeague[0]/Math.max(1,s.prevLeague[1]),s.prevLeague[2]/Math.max(1,s.prevLeague[3]),s.prevLeague[4]/Math.max(1,s.prevLeague[5])];
   for(let j=i;j<end;j++){
@@ -58,9 +60,10 @@ function featureRows(entries,{observations=false}={}){
    const hf=fac(H,A),af=fac(A,H);
    for(const [tid,own,opp] of [[h,hf,af],[a,af,hf]]){[own,opp].forEach((r,k)=>r.forEach((v,j)=>s.factors[tid][k][j]=.95*s.factors[tid][k][j]+.05*v));s.factorN[tid]=.95*s.factorN[tid]+.05;}
   }
-  for(let j=i;j<end;j++){const e=entries[j];for(const tid of [e.hid,e.aid]){s.lastDates[tid].push(date);if(s.lastDates[tid].length>4)s.lastDates[tid].shift();}}
+  if(!calendar)for(let j=i;j<end;j++){const e=entries[j];for(const tid of [e.hid,e.aid]){s.lastDates[tid].push(date);if(s.lastDates[tid].length>4)s.lastDates[tid].shift();}}
   s.through=date;i=end;
  }
+ if(calendar)while(calendarIndex<calendar.length){const c=calendar[calendarIndex++];if(record(c)&&(!s.through||c.d>s.through))s.through=c.d;}
  return {rows,state:s,usable};
 }
 function fitPool(rows,season){
@@ -84,7 +87,7 @@ function bootstrap(records){
 }
 function prospective(entries){const e=entries.filter(e=>e.pg&&e.pg.qv&&Number.isFinite(e.pg.baseMargin)&&Number.isFinite(e.pg.mm)&&e.pg.at&&(e.pg.tip||e.tip)&&Date.parse(e.pg.at)<Date.parse(e.pg.tip||e.tip));return {n:e.length,baseline:M.metrics(e.map(e=>({y:e.am,base:e.pg.baseMargin}))),selected:M.metrics(e.map(e=>({y:e.am,base:e.pg.mm})))};}
 function build(entries,{cutoff,season}={}){
- const data=M.clean(entries,cutoff);if(data.length<12000)return null;season=season||seasonOf(cutoff||data[data.length-1].d);const f=featureRows(data),rows=f.rows,folds=[];
+ const data=M.clean(entries,cutoff);if(data.length<12000)return null;season=season||seasonOf(cutoff||data[data.length-1].d);const f=featureRows(data,{calendar:GameContext?GameContext.workload(entries,cutoff):null}),rows=f.rows,folds=[];
  for(let sy=Math.max(data[0].sy+6,season-26);sy<season;sy++){
   const model=fitPool(rows,sy),test=rows.filter(r=>r.e.sy===sy);if(!model||test.length<300)continue;
   for(const r of test)folds.push({d:r.e.d,sy,y:r.y,p:[model.legacy(r,test[0].e.d),...COLS.slice(1).map((cols,j)=>dot(cols.map(c=>r.x[c]),model.coeff[j+1]))]});
@@ -107,7 +110,7 @@ function build(entries,{cutoff,season}={}){
  }
  const final=fitPool(rows,season),residual=history.map(r=>r.y-r.base);
  return {schema:1,version:VERSION,enabled,pointEnabled:enabled,season,trainedThrough:f.state.through,selection:{name:current.name,index:current.index,coeff:final.coeff[current.index],columns:COLS[current.index],trainN:final.n,metrics:current.selectionMetrics},state:f.state,
-  config:{trainSeasons:4,selectionSeasons:3,supported:NAMES,shotRegression:.5,carry:.65,rates:RATES},statistics:{all:stats(evaluated),recent:recentStats,annual,maeDifferenceCI95:ci,improvedRecentSeasons:improved},validation,
+  config:{contextVersion:GameContext?.VERSION||null,workloadCalendar:true,trainSeasons:4,selectionSeasons:3,supported:NAMES,shotRegression:.5,carry:.65,rates:RATES},statistics:{all:stats(evaluated),recent:recentStats,annual,maeDifferenceCI95:ci,improvedRecentSeasons:improved},validation,
   gate:{passed:enabled,criterion:'six-season nested MAE improvement > .05, RMSE/winner non-regression, at least five improved seasons, paired-day CI upper < 0'},
   grid:{step:.25,probabilities:grid(history)},residual:{n:residual.length,q10:quantile(residual,.1),q25:quantile(residual,.25),q75:quantile(residual,.75),q90:quantile(residual,.9),validationCoverage:validation.length?validation.reduce((s,r)=>s+r.referenceCoverage*r.selected.n,0)/validation.reduce((s,r)=>s+r.selected.n,0):null},prospective:prospective(entries),data:{games:data.length,withShots:f.usable}};
 }

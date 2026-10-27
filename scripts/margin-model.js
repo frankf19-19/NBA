@@ -1,5 +1,5 @@
 /* NBA margin research: shared, deterministic, no network and no external dependencies. */
-(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.NBAMargin=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
+(function(root,factory){const api=factory(typeof module==='object'&&module.exports?require('./game-context'):root.NBAGameContext);if(typeof module==='object'&&module.exports)module.exports=api;else root.NBAMargin=api;})(typeof globalThis!=='undefined'?globalThis:this,function(GameContext){
 'use strict';
 const VERSION='margin-v1',RATES=[.04,.08,.12],CARRY=.65,CLIP=35;
 const finite=Number.isFinite,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -8,7 +8,7 @@ const phaseDays=d=>d<14?0:d<30?1:d<60?2:d<120?3:4;
 const dayDiff=(a,b)=>(Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/864e5;
 function clean(entries,cutoff){
  const seen=new Set();return entries.filter(e=>{
-  if(!e||e.po||e.nu||e.nm||!finite(e.am)||!e.am||!e.f||!Array.isArray(e.f.x)||e.f.x.length!==7||!finite(e.f.b)||!e.f.x.every(finite)||!(e.hid>=1&&e.hid<=30&&e.aid>=1&&e.aid<=30)||!/^\d{4}-\d\d-\d\d$/.test(e.d||'')||(cutoff&&e.d>=cutoff))return false;
+  if(!e||e.po||e.nu||e.cf||(GameContext&&GameContext.ledgerFlags(e).nu)||e.nm||!finite(e.am)||!e.am||!e.f||!Array.isArray(e.f.x)||e.f.x.length!==7||!finite(e.f.b)||!e.f.x.every(finite)||!(e.hid>=1&&e.hid<=30&&e.aid>=1&&e.aid<=30)||!/^\d{4}-\d\d-\d\d$/.test(e.d||'')||(cutoff&&e.d>=cutoff))return false;
   const key=e.d+'|'+e.hid+'|'+e.aid;if(seen.has(key))return false;seen.add(key);return true;
  }).map(e=>({...e,sy:e.sy||seasonOf(e.d)})).sort((a,b)=>a.d.localeCompare(b.d)||String(a.id).localeCompare(String(b.id)));
 }

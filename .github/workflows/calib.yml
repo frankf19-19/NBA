@@ -42,6 +42,7 @@ jobs:
           node scripts/test-injury-report-time.cjs
           node scripts/test-robust-unit.cjs
           node scripts/test-injury-identity.cjs
+          node scripts/test-game-context.cjs
       - name: 執行校準
         env:
           NBA_FAST_REFRESH: ${{ (github.event_name == 'push' || github.event.schedule == '10 22 * * *' || github.event.schedule == '10 0 * * *') && '1' || '0' }}

@@ -1,0 +1,128 @@
+[
+  {
+    "id": "401607494",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401607494",
+    "neutralSite": false,
+    "notes": null,
+    "type": null,
+    "season": {
+      "year": 2024,
+      "current": false,
+      "type": 2
+    },
+    "groups": null,
+    "name": null
+  },
+  {
+    "id": "401607493",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401607493",
+    "neutralSite": false,
+    "notes": null,
+    "type": null,
+    "season": {
+      "year": 2024,
+      "current": false,
+      "type": 2
+    },
+    "groups": null,
+    "name": null
+  },
+  {
+    "id": "401607495",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401607495",
+    "neutralSite": true,
+    "notes": null,
+    "type": null,
+    "season": {
+      "year": 2024,
+      "current": false,
+      "type": 2
+    },
+    "groups": null,
+    "name": null
+  },
+  {
+    "id": "401734906",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401734906",
+    "neutralSite": true,
+    "notes": null,
+    "type": null,
+    "season": {
+      "year": 2025,
+      "current": false,
+      "type": 2
+    },
+    "groups": null,
+    "name": null
+  },
+  {
+    "id": "401734907",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401734907",
+    "neutralSite": true,
+    "notes": null,
+    "type": null,
+    "season": {
+      "year": 2025,
+      "current": false,
+      "type": 2
+    },
+    "groups": null,
+    "name": null
+  },
+  {
+    "id": "401734908",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401734908",
+    "neutralSite": true,
+    "notes": null,
+    "type": null,
+    "season": {
+      "year": 2025,
+      "current": false,
+      "type": 2
+    },
+    "groups": null,
+    "name": null
+  },
+  {
+    "id": "401809837",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401809837",
+    "neutralSite": true,
+    "notes": null,
+    "type": null,
+    "season": {
+      "year": 2026,
+      "current": false,
+      "type": 2
+    },
+    "groups": null,
+    "name": null
+  },
+  {
+    "id": "401809838",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401809838",
+    "neutralSite": true,
+    "notes": null,
+    "type": null,
+    "season": {
+      "year": 2026,
+      "current": false,
+      "type": 2
+    },
+    "groups": null,
+    "name": null
+  },
+  {
+    "id": "401809839",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401809839",
+    "neutralSite": true,
+    "notes": null,
+    "type": null,
+    "season": {
+      "year": 2026,
+      "current": false,
+      "type": 2
+    },
+    "groups": null,
+    "name": null
+  }
+]

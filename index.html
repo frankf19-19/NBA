@@ -458,10 +458,11 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.2.1 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.2.2 · 資料來源:ESPN 公開 API</footer>
 </div>
 
-<script src="scripts/margin-model.js?v=1"></script>
+<script src="scripts/game-context.js?v=1"></script>
+<script src="scripts/margin-model.js?v=2"></script>
 <script src="scripts/quality-model.js?v=1"></script>
 <script>
 // 儲存空間不可用時，仍允許瀏覽與切換主題。
@@ -557,6 +558,7 @@ async function fetchGames(date){
   const out=[];
   (d.events||[]).forEach(ev=>{
     const c=(ev.competitions||[])[0]||{};
+    const context=window.NBAGameContext?.classify(ev,c)||{neutralSite:c.neutralSite===true,cupFinal:false};
     const comp=c.competitors||[];
     const home=comp.find(x=>x.homeAway==='home')||{},away=comp.find(x=>x.homeAway==='away')||{};
     const st=c.status||ev.status||{};const ts=st.type||{};
@@ -571,7 +573,7 @@ async function fetchGames(date){
       stype:(ev.season&&ev.season.type)||2,syear:(ev.season&&ev.season.year)||null,
       away:away.team?.displayName||'客隊',home:home.team?.displayName||'主隊',
       awayAbbr:away.team?.abbreviation||'',homeAbbr:home.team?.abbreviation||'',
-      awayId:+(away.team?.id||away.id||0),homeId:+(home.team?.id||home.id||0),neutralSite:c.neutralSite===true,
+      awayId:+(away.team?.id||away.id||0),homeId:+(home.team?.id||home.id||0),neutralSite:context.neutralSite,cupFinal:context.cupFinal,
       awayScore:sc(away),homeScore:sc(home),
       awayWin:away.winner===true,homeWin:home.winner===true,
       awayRec:rec(away),homeRec:rec(home),
@@ -599,6 +601,7 @@ function fetchTeamSeason(teamId,season){
         const d=await jget(`${SB}/teams/${teamId}/schedule?season=${season}&seasontype=${t}`);
         (d.events||[]).forEach(e=>{
           const c=(e.competitions||[])[0]||{};const comp=c.competitors||[];
+          const context=window.NBAGameContext?.classify(e,c)||{neutralSite:c.neutralSite===true,cupFinal:false};
           const me=comp.find(x=>+(x.id||x.team?.id||0)===+teamId);
           const opp=comp.find(x=>x!==me);
           if(!me||!opp)return;
@@ -607,7 +610,7 @@ function fetchTeamSeason(teamId,season){
           rows.push({date:etDateOf(e.date),done,  /* ESPN 賽程時間是 UTC,美東晚場會跨日,必須換算成美東日期才能算對休息天數 */
             pf:num(me.score),pa:num(opp.score),
             won:me.winner===true,oppId:+(opp.id||opp.team?.id||0),
-            home:me.homeAway==='home'});
+            home:me.homeAway==='home',cupFinal:context.cupFinal});
         });
       }catch(e){failures++;}
     }
@@ -619,7 +622,8 @@ function fetchTeamSeason(teamId,season){
   return schedCache[key];
 }
 function statsAsOf(rows,asOf,gameDate){
-  const done=(rows||[]).filter(r=>r.done&&r.pf>0&&r.pa>0&&r.date<=asOf); /* 排除 0:0 空殼紀錄 */
+  const played=(rows||[]).filter(r=>r.done&&r.pf>0&&r.pa>0&&r.date<=asOf);
+  const done=played.filter(r=>!r.cupFinal); /* 排除 0:0 空殼紀錄 */
   const gp=done.length;
   if(!gp)return {gp:0};
   let w=0,l=0,pf=0,pa=0;
@@ -634,9 +638,9 @@ function statsAsOf(rows,asOf,gameDate){
     else if(!done[i].won&&stw<0)stw--;
     else break;
   }
-  const lastDate=done[done.length-1].date;
+  const lastDate=played[played.length-1].date;
   const l10w=last10.filter(r=>r.won).length;
-  const g4=gameDate?done.filter(r=>{const dd=daysBetween(r.date,gameDate);return dd>=1&&dd<=3;}).length:0;
+  const g4=gameDate?played.filter(r=>{const dd=daysBetween(r.date,gameDate);return dd>=1&&dd<=3;}).length:0;
   return {gp,w,l,pct:w/(w+l),rs:pf,ra:pa,rPFg,rPAg,streak:stw,
     rest:gameDate?daysBetween(lastDate,gameDate):null,lastDate,g4,
     l10:`${l10w}-${last10.length-l10w}`};
@@ -1061,17 +1065,18 @@ function teamBias(name,beforeDate){
 }
 
 function predict(g,pm,lg,date){
+  const neutralGame=!!(g.neutralSite||g.cupFinal);
   const H=pm[g.homeId]||{},A=pm[g.awayId]||{};
   const ok=lg&&H.gp>=5&&A.gp>=5;
   if(!ok){
     const hPct=H.pct??.5,aPct=A.pct??.5;
-    const hp=Math.max(.05,Math.min(.95,log5(hPct,aPct)+0.06));
+    const hp=Math.max(.05,Math.min(.95,log5(hPct,aPct)+(neutralGame?0:0.06)));
     return {home_prob:hp,away_prob:1-hp,predicted_winner:hp>=.5?g.home:g.away,
-      why:`資料不足(球季初、季前賽或夏季聯賽),改以賽前可取得勝率(缺資料採 0.500；主 ${hPct.toFixed(3)} vs 客 ${aPct.toFixed(3)})加主場優勢估計。`};
+      why:`資料不足(球季初、季前賽或夏季聯賽),改以賽前可取得勝率(缺資料採 0.500；主 ${hPct.toFixed(3)} vs 客 ${aPct.toFixed(3)})${neutralGame?'（中立場不加主場優勢）':'加主場優勢'}估計。`};
   }
-  const factors=[];
-  const distributionDate=(g.stype===1||g.stype===3||g.neutralSite)?null:date;
-  const gameHca=g.neutralSite?0:PRM.hca;
+  const factors=neutralGame?['中立場，未加主場優勢']:[];
+  const distributionDate=(g.stype===1||g.stype===3||neutralGame)?null:date;
+  const gameHca=neutralGame?0:PRM.hca;
   const hRS=H.rs/H.gp,hRA=H.ra/H.gp,aRS=A.rs/A.gp,aRA=A.ra/A.gp;
   const offense=(sv,rec)=>isFinite(rec)?{v:0.65*sv+0.35*rec,usedRec:true}:{v:sv,usedRec:false};
   const defense=(sv,rec)=>isFinite(rec)?{v:0.7*sv+0.3*rec,usedRec:true}:{v:sv,usedRec:false};
@@ -2158,8 +2163,8 @@ function renderFooter(){
     `自有資料庫:每場完整 box score、各節比分、球隊統計、裁判、賽前盤口、該場賽前傷兵,上季起每場逐球紀錄與勝率曲線;每日官方傷兵名單、戰績榜、新聞,每週球員資料庫快照,以及每場開打前含傷兵的預測,全部存在自己的 repo(seed/),不依賴 ESPN 日後是否保留`
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
-  const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程約台灣時間下午至晚間),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大，請以獨立期間的分差誤差與機率校準評估。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.2.1 · 資料來源:ESPN 公開 API`;
+  const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大，請以獨立期間的分差誤差與機率校準評估。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.2.2 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -2325,7 +2330,7 @@ async function samplesForDate(date){
         const nm=(mPre==null)?1:0; /* 無法預測(如新成軍球隊前 5 場):照樣收錄比賽與球員數據,但不入命中、校準與學習 */
         if(nm)skipped++;
         samples.push({id:g.id,d:date,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,
-          st:g.stype,sy:season,po:(g.stype===3||g.stype===5)?1:0,nm,
+          st:g.stype,sy:season,po:(g.stype===3||g.stype===5)?1:0,nu:g.neutralSite?1:0,cf:g.cupFinal?1:0,nm,
           m:nm?0:mPre,f:nm?null:p.f,homeWon,actM:(g.homeScore??0)-(g.awayScore??0),hs:g.homeScore,as:g.awayScore,
           mb:nm?null:p.mb,mbp:nm?null:+(+p.mbp).toFixed(3),mk:p.mk,mm:nm?null:+(+p.raw_margin).toFixed(2)});
       });
@@ -2339,7 +2344,7 @@ async function collectSamples(days,prog){
     const date=shiftDate(etToday(),-i);
     if(prog)prog(i,days,samples.length);
     try{const r=await samplesForDate(date);
-      r.samples.filter(x=>!x.po&&!x.nm).forEach(x=>samples.push(x));skipped+=r.skipped;}catch(e){}
+      r.samples.filter(x=>!x.po&&!x.nu&&!x.cf&&!x.nm).forEach(x=>samples.push(x));skipped+=r.skipped;}catch(e){}
   }
   return {samples,skipped};
 }
