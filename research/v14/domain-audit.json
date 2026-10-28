@@ -1,0 +1,27 @@
+{
+  "source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20260414&limit=100",
+  "observedOn": "2026-10-28",
+  "events": [
+    {
+      "id": "401866755",
+      "date": "2026-04-14T23:30Z",
+      "season": {
+        "year": 2026,
+        "type": 5,
+        "slug": "play-in-season"
+      }
+    },
+    {
+      "id": "401866754",
+      "date": "2026-04-15T02:00Z",
+      "season": {
+        "year": 2026,
+        "type": 5,
+        "slug": "play-in-season"
+      }
+    }
+  ],
+  "legacyGuardResult": "2026-04-14",
+  "repairedGuardResult": null,
+  "meaning": "The old guard can pass a play-in date to regular-only quality/distribution models. The repaired guard matches full-playoff domain exclusion. No accuracy gain claimed."
+}

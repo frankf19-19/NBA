@@ -458,7 +458,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.2.2 · 資料來源:ESPN 公開 API</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.2.3 · 資料來源:ESPN 公開 API</footer>
 </div>
 
 <script src="scripts/game-context.js?v=1"></script>
@@ -1080,7 +1080,7 @@ function predict(g,pm,lg,date){
       why:`資料不足(球季初、季前賽或夏季聯賽),改以賽前可取得勝率(缺資料採 0.500；主 ${hPct.toFixed(3)} vs 客 ${aPct.toFixed(3)})${neutralGame?'（中立場不加主場優勢）':'加主場優勢'}估計。`};
   }
   const factors=neutralGame?['中立場，未加主場優勢']:[];
-  const distributionDate=(g.stype===1||g.stype===3||neutralGame)?null:date;
+  const distributionDate=(g.stype===1||g.stype===3||g.stype===5||neutralGame)?null:date;
   const gameHca=neutralGame?0:PRM.hca;
   const hRS=H.rs/H.gp,hRA=H.ra/H.gp,aRS=A.rs/A.gp,aRA=A.ra/A.gp;
   const offense=(sv,rec)=>isFinite(rec)?{v:0.65*sv+0.35*rec,usedRec:true}:{v:sv,usedRec:false};
@@ -2169,7 +2169,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大，請以獨立期間的分差誤差與機率校準評估。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.2.2 · 資料來源:ESPN 公開 API`;
+  el.innerHTML=`${esc(parts.join(';'))}。<br>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。<br>NBA 單場波動大，請以獨立期間的分差誤差與機率校準評估。此頁僅供興趣追蹤,非投注建議。<br>NBA 預測計分板 v3.2.3 · 資料來源:ESPN 公開 API`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -2736,4 +2736,5 @@ if(!window.__CLOUD_BUILD){
 </script>
 </body>
 </html>
+
 

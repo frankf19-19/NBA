@@ -1,0 +1,35 @@
+{
+  "cutoff": "2026-07-01",
+  "lastHistoricalGame": "2026-06-13",
+  "rows": 40199,
+  "regular": 37708,
+  "fullPlayoffs": 2491,
+  "numpy": "2.4.2",
+  "files": [
+    {
+      "path": "research/v14/source.json",
+      "bytes": 7593054,
+      "sha256": "bfe048a39169d9e9063bd429e3be0c4622b09c44003373900a00cf43de155075"
+    },
+    {
+      "path": "research/v14/features.npz",
+      "bytes": 2613437,
+      "sha256": "bf555b21328b8f92c2287e015d1b95a1f44855dff03200c1b017ffa00fcc1846"
+    },
+    {
+      "path": "research/v14/predictions.npz",
+      "bytes": 283466,
+      "sha256": "2354b9ff6628199497bc45ff7814ec7707f9047d524283752a609bf3d8463574"
+    },
+    {
+      "path": "research/v7/clean-reference.npz",
+      "bytes": 10559448,
+      "sha256": "10223972df3a2e8fbc5a6cf1315a1e78974fe27c2eb5d9ee4e080c9b61b181d6"
+    },
+    {
+      "path": "research/v11/source.json",
+      "bytes": 12686625,
+      "sha256": "ffee87a06af1a10f31ffa089abc165a864aa4dbe8194a2dad889472ff32867e1"
+    }
+  ]
+}

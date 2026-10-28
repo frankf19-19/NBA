@@ -1,0 +1,6 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync('index.html','utf8'),start=html.indexOf('function predict('),end=html.indexOf('  const gameHca=',start),prefix=html.slice(start,end),g={homeId:1,awayId:2,stype:5},pm={1:{gp:5},2:{gp:5}},date='2026-04-14';
+function decision(source){const c=vm.createContext({log5:()=>.5});vm.runInContext(source+'return distributionDate;}',c);return c.predict(g,pm,112,date);}
+assert.equal(decision(prefix),null);assert.equal(decision(prefix.replace('||g.stype===5','')),date);
+const report={source:'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20260414&limit=100',observedOn:'2026-10-28',events:[{id:'401866755',date:'2026-04-14T23:30Z',season:{year:2026,type:5,slug:'play-in-season'}},{id:'401866754',date:'2026-04-15T02:00Z',season:{year:2026,type:5,slug:'play-in-season'}}],legacyGuardResult:date,repairedGuardResult:null,meaning:'The old guard can pass a play-in date to regular-only quality/distribution models. The repaired guard matches full-playoff domain exclusion. No accuracy gain claimed.'};
+fs.writeFileSync('research/v14/domain-audit.json',JSON.stringify(report,null,2));console.log('Play-in domain audit passed: official feed type5, old failure reproduced, repaired guard excluded.');

@@ -1,0 +1,10 @@
+{
+  "ratingCutoff": "2024-11-01",
+  "ratingPastAndSameDayUnchanged": 37654,
+  "seriesCutoff": "2025-05-01",
+  "seriesPastAndSameDayUnchanged": 1632,
+  "changedLaterSeriesRows": 119,
+  "firstSeriesGameHasNoSeriesResultFeature": true,
+  "targetSeasonOutcomesDoNotFitItsCoefficients": true,
+  "seriesGamesAndKeysIndependentOfFutureScores": true
+}
