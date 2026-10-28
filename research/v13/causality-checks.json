@@ -1,0 +1,9 @@
+{
+  "cutoff": "2024-11-01",
+  "pastAndSameDayUnchanged": 35332,
+  "changedFutureRows": 2373,
+  "missingPossessionsSkipEfficiencyUpdates": true,
+  "rawScoreModelStillUpdatesWithoutShotBoxes": true,
+  "targetSeasonScoresDoNotFitTheirCoefficients": true,
+  "sideShootingNetParityMaxError": 7.105427357601002e-15
+}

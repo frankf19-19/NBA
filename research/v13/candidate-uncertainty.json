@@ -1,0 +1,10 @@
+{
+  "candidate": "regressedOffDef",
+  "n": 7224,
+  "maeDifference": 0.0010815697589726852,
+  "pairedDateCI95": [
+    -0.006017651775620886,
+    0.008361704681696057
+  ],
+  "note": "Retrospective descriptive uncertainty, not new blind evidence or corrected for repeated model comparisons"
+}
