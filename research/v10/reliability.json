@@ -1,0 +1,74 @@
+{
+  "kernel": {
+    "n": 7224,
+    "hits": 1199,
+    "meanTopProbability": 0.1718649693333937,
+    "actualTopAccuracy": 0.16597452934662238,
+    "reliability": [
+      {
+        "lower": 0,
+        "upper": 0.15,
+        "n": 82,
+        "meanProbability": 0.14776731108200986,
+        "observedAccuracy": 0.10975609756097561
+      },
+      {
+        "lower": 0.15,
+        "upper": 0.2,
+        "n": 6970,
+        "meanProbability": 0.169523012076683,
+        "observedAccuracy": 0.16327116212338594
+      },
+      {
+        "lower": 0.2,
+        "upper": 0.25,
+        "n": 74,
+        "meanProbability": 0.2192729120991299,
+        "observedAccuracy": 0.2702702702702703
+      },
+      {
+        "lower": 0.25,
+        "upper": 1,
+        "n": 98,
+        "meanProbability": 0.32279621720301277,
+        "observedAccuracy": 0.32653061224489793
+      }
+    ]
+  },
+  "halfFactorized": {
+    "n": 7224,
+    "hits": 1208,
+    "meanTopProbability": 0.17371771276525122,
+    "actualTopAccuracy": 0.1672203765227021,
+    "reliability": [
+      {
+        "lower": 0,
+        "upper": 0.15,
+        "n": 265,
+        "meanProbability": 0.14813369069107243,
+        "observedAccuracy": 0.1471698113207547
+      },
+      {
+        "lower": 0.15,
+        "upper": 0.2,
+        "n": 6770,
+        "meanProbability": 0.1718852053066005,
+        "observedAccuracy": 0.16454948301329395
+      },
+      {
+        "lower": 0.2,
+        "upper": 0.25,
+        "n": 93,
+        "meanProbability": 0.21836162676299478,
+        "observedAccuracy": 0.24731182795698925
+      },
+      {
+        "lower": 0.25,
+        "upper": 1,
+        "n": 96,
+        "meanProbability": 0.3303214350874668,
+        "observedAccuracy": 0.3333333333333333
+      }
+    ]
+  }
+}
