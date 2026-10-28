@@ -23,6 +23,7 @@ const GameContext=require('./game-context.js');
 const Quality=require('./quality-model.js');
 const Robust=require('./robust-model.cjs');
 const Availability=require('./availability-model.cjs');
+const ForecastAudit=require('./forecast-audit.cjs');
 const InjuryTime=require('./injury-report-time.cjs');
 const {JSDOM,VirtualConsole}=require('jsdom');
 /* 版本:v3.0(傷兵改以最終分數加在 K 與季內乘數之後,上限 −7)v2.7(ESPN BPI 回補與三來源混合、官方裁判派遣、官方傷兵報告 PDF、球員異動、球隊進階統計快照)v2.6(逐球紀錄改 gzip、回補 10 季;賽前傷兵只信賽後 3 天內擷取)v2.3(市場盤口對照與裁判因子,皆滾動驗證後才啟用)v2.2(完整比賽過程:逐球紀錄、勝率曲線、裁判、盤口、該場賽前傷兵)v2.1(勝分差區間機率表與全中回測)v2.0(自有資料庫:完整 box score/各節比分/每日傷兵、戰績、新聞快照/球員資料庫週快照/賽前含傷兵預測,並由賽前傷兵學係數)v1.9(掃描前先套學習參數、輸出各季開幕日 ssMap)v1.8(季內時間刻度、傷兵係數不再拉回 0.35)v1.7.2(K/σ 改用兩季窗口、逐隊偏差需驗證才啟用)v1.7.1(休息天數美東日期修正)v1.7(參數學習 + 攻守效率 + 公平回測)v1.6.3(同場重複登錄去重、賽季依日期推算、收錄無預測場次) 1994-95 季起全部賽季(不用 localStorage) + 失敗日期重試 + 排除表演賽與空殼場次 */
@@ -450,6 +451,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   console.log(`勝分差區間:採用 ${mbUse}(回測 實戰表 ${MBT.tot.emp}% / 常態 ${MBT.tot.norm}%),σ殘差 ${sigmaM}`);
 
   /* Independent OOF margin calibration; never overwrite frozen historical forecasts. */
+  fs.writeFileSync('forecast-audit.json',JSON.stringify(ForecastAudit.build(LED)));
   try{const artifact=Margin.build(LED,{cutoff:today,season:seasonNow});if(artifact){
     fs.writeFileSync(F_MARGIN,JSON.stringify(artifact));E(`MARGIN_MODEL=${JSON.stringify(artifact)}`);
     console.log('勝分差時間外校準',JSON.stringify(artifact.validation));

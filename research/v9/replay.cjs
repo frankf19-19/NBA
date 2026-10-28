@@ -1,0 +1,5 @@
+const fs=require('fs'),M=require('../../scripts/margin-model'),C=require('../../scripts/game-context');
+const ref=JSON.parse(fs.readFileSync('research/v7/clean-reference.json')),all=fs.readdirSync('research/data/seed').filter(f=>/^ledger-\d{4}\.json$/.test(f)).flatMap(f=>JSON.parse(fs.readFileSync('research/data/seed/'+f))),lookup=new Map(all.map(e=>[String(e.id),e])),rows=ref.meta.map((e,i)=>({e:lookup.get(String(e.id)),x:ref.X[i],y:e.am}));
+const physical=[...new Set(C.workload(all,'2026-07-01').map(e=>e.d))].sort(),previous=new Map(physical.map((d,i)=>[d,physical[i-1]]));
+const output=[];for(let sy=2021;sy<=2026;sy++){const legacy=M.legacyModel(rows,sy),te=rows.filter(r=>r.e.sy===sy),first=te[0].e.d;for(const r of te){const i=rows.indexOf(r),prev=previous.get(r.e.d),gap=(Date.parse(r.e.d)-Date.parse(prev))/864e5;output.push({id:r.e.id,d:r.e.d,sy,gap,previous:prev,y:r.y,quality:ref.base[i],legacy:legacy(r,first),restEligible:gap>1&&gap<=14&&+prev.slice(0,4)+(+prev.slice(5,7)>=8?1:0)===sy});}}
+fs.writeFileSync('research/v9/replay.json',JSON.stringify(output));console.log('replayed',output.length);
