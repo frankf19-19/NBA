@@ -1,0 +1,22 @@
+{
+  "records": 37708,
+  "lastHistoricalGame": "2026-04-12",
+  "numpy": "2.4.2",
+  "files": [
+    {
+      "path": "research/v7/clean-reference.npz",
+      "bytes": 10559448,
+      "sha256": "10223972df3a2e8fbc5a6cf1315a1e78974fe27c2eb5d9ee4e080c9b61b181d6"
+    },
+    {
+      "path": "research/v15/predictions.npy",
+      "bytes": 2111776,
+      "sha256": "c4879a51ceb587a2b4ee1ff1f0189877c8304db618f7b4868890cbebdf13bf39"
+    },
+    {
+      "path": "research/v15/selected.npy",
+      "bytes": 301792,
+      "sha256": "34b6c7b3f7892801c5eaf98a352287475c11f0e58979ea6d38d77480a534a0dd"
+    }
+  ]
+}

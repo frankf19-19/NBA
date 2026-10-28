@@ -1,0 +1,9 @@
+{
+  "candidate": "daily1461",
+  "maeDifference": -0.0023846604252891726,
+  "pairedDateCI95": [
+    -0.008342067107235297,
+    0.0033981771546413445
+  ],
+  "scope": "Descriptive retrospective candidate, not selected by past-only policy and not corrected for repeated comparisons"
+}

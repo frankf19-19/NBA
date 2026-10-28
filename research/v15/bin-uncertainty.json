@@ -1,0 +1,59 @@
+{
+  "scope": "All predeclared candidates, retrospective descriptive intervals, no multiple-comparison correction",
+  "candidates": {
+    "window2": {
+      "loglossDifference": 0.00027565281714332873,
+      "pairedDateCI95": [
+        -0.0009216185387415434,
+        0.001402646803604891
+      ],
+      "hits": 1194,
+      "baselineHits": 1199
+    },
+    "window6": {
+      "loglossDifference": -0.00015189223463884247,
+      "pairedDateCI95": [
+        -0.0008946424201760463,
+        0.000598706260660402
+      ],
+      "hits": 1212,
+      "baselineHits": 1199
+    },
+    "halfLife365": {
+      "loglossDifference": -1.4894842585344097e-05,
+      "pairedDateCI95": [
+        -0.0008236562696333544,
+        0.0007519790891648503
+      ],
+      "hits": 1202,
+      "baselineHits": 1199
+    },
+    "halfLife730": {
+      "loglossDifference": -0.00032205161961240583,
+      "pairedDateCI95": [
+        -0.000786848505880276,
+        0.00013472796500279763
+      ],
+      "hits": 1214,
+      "baselineHits": 1199
+    },
+    "daily1461": {
+      "loglossDifference": -0.0004257760825318789,
+      "pairedDateCI95": [
+        -0.0010241769651597788,
+        0.00013775469705944459
+      ],
+      "hits": 1191,
+      "baselineHits": 1199
+    },
+    "halfDaily": {
+      "loglossDifference": -0.00014423983888370417,
+      "pairedDateCI95": [
+        -0.0004724844907761485,
+        0.00017603361875170347
+      ],
+      "hits": 1200,
+      "baselineHits": 1199
+    }
+  }
+}

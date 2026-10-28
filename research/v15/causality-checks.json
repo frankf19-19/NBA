@@ -1,0 +1,27 @@
+{
+  "cutoff": "2024-11-01",
+  "pastAndSameDayPredictionsUnchanged": 33323,
+  "changedFuturePredictions": 2376,
+  "directFitChecks": [
+    {
+      "date": "2024-11-01",
+      "latestTrainDate": "2024-10-31",
+      "n": 4839,
+      "predictionMaxError": 1.071143174158351e-12
+    },
+    {
+      "date": "2025-03-01",
+      "latestTrainDate": "2025-02-28",
+      "n": 5152,
+      "predictionMaxError": 6.769029781139579e-13
+    },
+    {
+      "date": "2026-04-12",
+      "latestTrainDate": "2026-04-10",
+      "n": 4899,
+      "predictionMaxError": 1.149302875091962e-12
+    }
+  ],
+  "weightRescalingCoefficientMaxError": 6.5780714209040525e-15,
+  "targetSeasonOutcomesDoNotFitAnnualCoefficients": true
+}
