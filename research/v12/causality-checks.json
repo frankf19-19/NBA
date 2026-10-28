@@ -1,0 +1,8 @@
+{
+  "cutoff": "2024-11-01",
+  "pastAndSameDayUnchanged": 35332,
+  "changedFutureRows": 2373,
+  "baselineProbabilityParityMaxError": 0.0,
+  "mirrorMaxError": 5.551115123125783e-17,
+  "targetSeasonScoresDoNotFitTheirProbabilities": true
+}

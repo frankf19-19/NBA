@@ -1,0 +1,37 @@
+{
+  "scope": "Descriptive diagnostics only; no extra model fitting or selection",
+  "paceTotalVersusKernel": {
+    "difference": 0.0014784596703531748,
+    "pairedDateCI95": [
+      0.0007884580143150954,
+      0.002180386405478611
+    ]
+  },
+  "paceTotalVersusPriorControl": {
+    "difference": -4.963154324154504e-05,
+    "pairedDateCI95": [
+      -0.0005244516234132815,
+      0.00041146774749723587
+    ]
+  },
+  "cohorts": [
+    {
+      "name": "belowPriorPace",
+      "n": 744,
+      "pointRMSE": 14.30733576087452,
+      "meanAbsolutePredictedMargin": 5.177295594206918
+    },
+    {
+      "name": "nearPriorPace",
+      "n": 5834,
+      "pointRMSE": 13.849982808684898,
+      "meanAbsolutePredictedMargin": 5.319440367572635
+    },
+    {
+      "name": "abovePriorPace",
+      "n": 646,
+      "pointRMSE": 14.078502758062868,
+      "meanAbsolutePredictedMargin": 5.232179265627683
+    }
+  ]
+}

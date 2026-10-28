@@ -1,0 +1,33 @@
+{
+  "cutoff": "2026-07-01",
+  "lastHistoricalGame": "2026-04-12",
+  "records": 37708,
+  "numpy": "2.4.2",
+  "files": [
+    {
+      "path": "research/v7/clean-reference.npz",
+      "bytes": 10559448,
+      "sha256": "10223972df3a2e8fbc5a6cf1315a1e78974fe27c2eb5d9ee4e080c9b61b181d6"
+    },
+    {
+      "path": "research/v7/clean-meta.json",
+      "bytes": 3140625,
+      "sha256": "76415de5cf82008ee33cbd75c78445dc25d3bda2aef3b8b93a70cbe70d1648cc"
+    },
+    {
+      "path": "research/v12/source.json",
+      "bytes": 5288910,
+      "sha256": "1c6d8def6f69efa66014395e1aa1b8b39e148c3aabb72fd0ca3762071f29c4e4"
+    },
+    {
+      "path": "research/v12/features.npz",
+      "bytes": 2715476,
+      "sha256": "a856801209a285dfdeb9d8e3ba5e91223063fde93c94780dc66499856fd5c39a"
+    },
+    {
+      "path": "research/v12/probabilities.npy",
+      "bytes": 25339904,
+      "sha256": "e42d8acad3910346ae81af5a189c04b707db562c81d6b76c5267df70bac99960"
+    }
+  ]
+}

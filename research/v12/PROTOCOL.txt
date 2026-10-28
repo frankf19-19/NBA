@@ -1,0 +1,10 @@
+2026-10-28 fixed before evaluating this round's scores.
+Repeated historical research, not a new blind test. Fixed current regress3 clean OOF margins. Do not change point predictions or injury weights.
+New question: empirical margin-bin probabilities conditional on pregame playing style, instead of the earlier log-variance/normal/Student-t models.
+Six methods: current 1D kernel; conditional pace; conditional expected total; conditional 3PA volume; conditional pace+total; half current/half pace+total.
+Past-only team own/allowed EWMA .05, previous-season league prior, team offseason carry .65, prior weight1. Features centered by previous league: pace/5 possessions, expected total/20 points, combined expected 3PA/10. No market totals or current-game stats.
+Conditional weights: existing margin bandwidth2 times exp(-.5*context squared distance), fixed context bandwidth1, 100 pseudo-observations toward simultaneous current 1D-kernel probabilities. Same-day batch feature updates.
+Fit probabilities on previous3 OOF seasons. Generate2012-2026; annual selection2015+ on previous3 years: logloss gain>=.002, Brier nonregression, top1 bins nonregression, simplest within .001 of best; otherwise current.
+Primary report2021-2026 all7224 games. Promotion: pooled logloss/Brier/top1 nonregression, >=4/6 years logloss improvement, paired-date logloss CI95 upper<0. Even passing retrospective evidence is not a new blind win. No post-result candidate or threshold additions.
+
+Pre-output control added before probability fitting: unconditional empirical-prior kernel, identical new prior but no context distance. Seven total methods. This separates the effect of changing prior from the effect of adding style. Report comparisons with this control; do not attribute smoothing-only gains to pace or totals. Selection thresholds otherwise unchanged.
