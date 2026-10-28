@@ -1,0 +1,9 @@
+2026-10-28, fixed before observing this round's scores.
+Repeated historical research, not a new blind test. Current fixed regress3 clean reference.
+Candidates: current; carry0.35; carry0.85; diagonal uncertainty ratings; innovation-adaptive uncertainty ratings; observed-roster carry; separated prior component.
+All use identical past-only shooting-adjusted targets and same-day batches. Three rates or process scales, previous four seasons ridge10. Fixed hyperparameters in features.py before evaluation.
+Roster continuity only uses player minutes in games strictly before the prediction date; starts adjusting after 3 observed team games; unknown/incomplete box data retains baseline. Never use current-game players to predict that game.
+Primary policy: apply candidate only during first30 calendar days from each season's first eligible game; baseline elsewhere. Candidate state still updates over the full season.
+Each year's selection uses previous3 years first30 MAE improvement >=0.05, early RMSE <=baseline+0.02, early winner >=baseline-0.005; choose simplest within0.02 of best. Otherwise current.
+Promotion evidence: first30 MAE gain>=0.10, paired-date CI95 upper<0, >=4/6 early-year improvements, full-season MAE/RMSE/winner nonregression. Do not change thresholds or add candidates after outputs.
+Report 2021-2026 all 7224 games, early cohort, each candidate, annual choices, missing roster coverage. No 2027 outcomes used to choose parameters. No automatic promotion.

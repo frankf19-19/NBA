@@ -1,0 +1,10 @@
+{
+  "cutoff": "2024-11-01",
+  "unchangedPastAndSameDay": 35332,
+  "changedFutureRows": 2373,
+  "changedFutureRosterRows": 2325,
+  "currentGamePointsAndRosterNeverPredictThemselves": true,
+  "invalidRosterFeaturesEqualBaseline": true,
+  "targetSeasonScoresDoNotFitItsCoefficients": true,
+  "baselineRatingMaxError": 7.105427357601002e-15
+}

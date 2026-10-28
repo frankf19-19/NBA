@@ -1,0 +1,34 @@
+{
+  "cutoff": "2026-07-01",
+  "lastHistoricalGame": "2026-04-12",
+  "records": 37708,
+  "research": "retrospective only; frozen current-family reference",
+  "numpy": "2.4.2",
+  "files": [
+    {
+      "path": "research/v7/clean-reference.npz",
+      "bytes": 10559448,
+      "sha256": "10223972df3a2e8fbc5a6cf1315a1e78974fe27c2eb5d9ee4e080c9b61b181d6"
+    },
+    {
+      "path": "research/v7/clean-meta.json",
+      "bytes": 3140625,
+      "sha256": "76415de5cf82008ee33cbd75c78445dc25d3bda2aef3b8b93a70cbe70d1648cc"
+    },
+    {
+      "path": "research/v11/source.json",
+      "bytes": 12686625,
+      "sha256": "ffee87a06af1a10f31ffa089abc165a864aa4dbe8194a2dad889472ff32867e1"
+    },
+    {
+      "path": "research/v11/features.npz",
+      "bytes": 25756262,
+      "sha256": "cdd2d46f6e845678105762d71e7e67dbe946c642563d85af7af8ee8e9914d5ec"
+    },
+    {
+      "path": "research/v11/predictions.npy",
+      "bytes": 2111776,
+      "sha256": "82057cd8e23bfe4cc429c377c67ee55a77d2be165d2cfc8cced36189a93aef22"
+    }
+  ]
+}

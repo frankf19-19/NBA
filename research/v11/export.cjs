@@ -1,0 +1,4 @@
+const fs=require('fs'),M=require('../../scripts/margin-model'),Q=require('../../scripts/quality-model'),C=require('../../scripts/game-context');
+const all=fs.readdirSync('research/data/seed').filter(f=>/^ledger-\d{4}\.json$/.test(f)).flatMap(f=>JSON.parse(fs.readFileSync('research/data/seed/'+f))),cutoff='2026-07-01',clean=M.clean(all,cutoff),f=Q.featureRows(clean,{observations:true,calendar:C.workload(all,cutoff)});
+const meta=f.rows.map(r=>({id:r.e.id,d:r.e.d,sy:r.e.sy,hid:r.e.hid,aid:r.e.aid,players:['h','a'].map(sd=>(r.e.pl?.[sd]||[]).filter(p=>p.id&&Number.isFinite(p.min)&&p.min>=0).map(p=>[String(p.id),p.min]))}));
+fs.writeFileSync('research/v11/source.json',JSON.stringify({meta,noise:f.rows.map(r=>r.noise[0])}));console.log(JSON.stringify({rows:meta.length,withPlayers:meta.filter(r=>r.players.every(p=>p.length>=5)).length}));
