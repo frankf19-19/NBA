@@ -1,0 +1,7 @@
+2026-10-29 Taiwan / 2026-10-28 UTC prospective study, fixed before any archive outcomes.
+Question: do actual newer pre-tip snapshots improve point margin and12-bin probabilities compared with earlier snapshots?
+No retrospective backfill. Only newly computed regular non-neutral pre-tip observations, with captured at and archive capture savedAt immediately before atomic persistence both before actual tip. Existing frozen ledgers are not rewritten. Corrupt archive is preserved, never silently replaced.
+Early window:120-360 minutes before tip. Near window:0-60 minutes. Choose latest actual savedAt within each window, one paired game. Require identical event, date, teams, actual tip and quality version/name. Compare same completed outcome. No selecting window using game outcome. If no pair, report0, not fabricated improvement.
+Primary margin MAE/RMSE/winner; probability logloss/Brier/top1 on only pairs with valid12 probabilities both sides. Record report publication age and injury-adjustment differences as descriptive context, not causal proof of injury information.
+At least20 distinct completed dates before any statistical improvement claim; no automatic promotion or injury-weight fitting from this archive. Earlier studied historical results remain retrospective.
+Existing GitHub schedule can delay: observe actual capture timestamps, not promised cron times. This round does not claim to guarantee last-minute updates or create a new external monitor.

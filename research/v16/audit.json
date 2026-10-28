@@ -1,0 +1,288 @@
+{
+  "asOf": "2026-10-28T23:26:24Z",
+  "scope": "Descriptive verified pre-tip evidence; no new coefficient fitting",
+  "verified": {
+    "schema": 1,
+    "version": "forecast-audit-v1",
+    "forecastVersion": "quality-v1",
+    "scope": "paired immutable pre-tip non-neutral regular-season forecasts; no automatic model selection",
+    "n": 13,
+    "dates": 2,
+    "from": "2026-10-26",
+    "through": "2026-10-27",
+    "baseline": {
+      "n": 13,
+      "mae": 10.701280569880542,
+      "rmse": 13.525235591283154,
+      "winner": 0.6153846153846154
+    },
+    "selected": {
+      "n": 13,
+      "mae": 11.126923076923077,
+      "rmse": 13.708252708047526,
+      "winner": 0.6153846153846154
+    },
+    "maeDifference": 0.42564250704253703,
+    "bins": {
+      "n": 13,
+      "hits": 3,
+      "accuracy": 0.23076923076923078,
+      "probabilityN": 13,
+      "brier": 0.8639908501203893,
+      "logloss": 2.2062232106175466,
+      "missingOrInvalidProbabilities": 0
+    },
+    "intervals": {
+      "n": 13,
+      "coverage": 0.8461538461538461,
+      "nominal": 0.8,
+      "meanWidth": 35.71035358409587
+    },
+    "excluded": {},
+    "automaticPromotion": false,
+    "warning": "Fewer than 20 distinct game dates; descriptive only, no reliable improvement claim."
+  },
+  "records": [
+    {
+      "id": "401909876",
+      "date": "2026-10-26",
+      "margin": 12.18,
+      "baseline": 7.609885956407112,
+      "actual": -20,
+      "absoluteError": 32.18,
+      "leadMinutes": 141.44555,
+      "injuryDifference": 2.9,
+      "reportPublished": null
+    },
+    {
+      "id": "401909870",
+      "date": "2026-10-26",
+      "margin": 13.35,
+      "baseline": 8.087126405357257,
+      "actual": 35,
+      "absoluteError": 21.65,
+      "leadMinutes": 31.08491666666667,
+      "injuryDifference": 0.6000000000000001,
+      "reportPublished": null
+    },
+    {
+      "id": "401909877",
+      "date": "2026-10-27",
+      "margin": 14.48,
+      "baseline": 9.009779438673819,
+      "actual": 1,
+      "absoluteError": 13.48,
+      "leadMinutes": 264.8562166666667,
+      "injuryDifference": -0.6,
+      "reportPublished": "2026-10-27T19:00:00.000Z"
+    },
+    {
+      "id": "401909879",
+      "date": "2026-10-27",
+      "margin": 14.04,
+      "baseline": 10.121657918691636,
+      "actual": 27,
+      "absoluteError": 12.96,
+      "leadMinutes": 294.85271666666665,
+      "injuryDifference": 0.3999999999999999,
+      "reportPublished": "2026-10-27T19:00:00.000Z"
+    },
+    {
+      "id": "401909878",
+      "date": "2026-10-27",
+      "margin": 1.51,
+      "baseline": -1.5973266674180975,
+      "actual": 14,
+      "absoluteError": 12.49,
+      "leadMinutes": 294.8543833333333,
+      "injuryDifference": 1.3,
+      "reportPublished": "2026-10-27T19:00:00.000Z"
+    },
+    {
+      "id": "401909871",
+      "date": "2026-10-26",
+      "margin": 8.33,
+      "baseline": 2.9209967540558326,
+      "actual": -4,
+      "absoluteError": 12.33,
+      "leadMinutes": 31.08385,
+      "injuryDifference": 1.7,
+      "reportPublished": null
+    },
+    {
+      "id": "401909874",
+      "date": "2026-10-26",
+      "margin": -0.31,
+      "baseline": 1.087141045729517,
+      "actual": 10,
+      "absoluteError": 10.31,
+      "leadMinutes": 51.44773333333333,
+      "injuryDifference": 0,
+      "reportPublished": null
+    },
+    {
+      "id": "401909880",
+      "date": "2026-10-27",
+      "margin": 1.29,
+      "baseline": 1.3213384282522505,
+      "actual": -7,
+      "absoluteError": 8.29,
+      "leadMinutes": 101.17678333333333,
+      "injuryDifference": 1.5,
+      "reportPublished": "2026-10-28T01:00:00.000Z"
+    },
+    {
+      "id": "401909875",
+      "date": "2026-10-26",
+      "margin": 1.23,
+      "baseline": -4.932982392954449,
+      "actual": -5,
+      "absoluteError": 6.23,
+      "leadMinutes": 81.44671666666666,
+      "injuryDifference": -0.7,
+      "reportPublished": null
+    },
+    {
+      "id": "401909873",
+      "date": "2026-10-26",
+      "margin": 5.87,
+      "baseline": 6.8481816470113746,
+      "actual": 11,
+      "absoluteError": 5.13,
+      "leadMinutes": 21.448633333333333,
+      "injuryDifference": -0.7,
+      "reportPublished": null
+    },
+    {
+      "id": "401909872",
+      "date": "2026-10-26",
+      "margin": 3.09,
+      "baseline": 2.247669102351609,
+      "actual": 8,
+      "absoluteError": 4.91,
+      "leadMinutes": 21.4495,
+      "injuryDifference": 2.1,
+      "reportPublished": null
+    },
+    {
+      "id": "401909868",
+      "date": "2026-10-26",
+      "margin": 11.03,
+      "baseline": 0.9000113018940983,
+      "actual": 7,
+      "absoluteError": 4.029999999999999,
+      "leadMinutes": 1.0871333333333333,
+      "injuryDifference": -1.6,
+      "reportPublished": null
+    },
+    {
+      "id": "401909869",
+      "date": "2026-10-26",
+      "margin": 2.66,
+      "baseline": -1.882089977629846,
+      "actual": 2,
+      "absoluteError": 0.6600000000000001,
+      "leadMinutes": 1.0860333333333334,
+      "injuryDifference": 0.7,
+      "reportPublished": null
+    }
+  ],
+  "captures": [
+    {
+      "id": "401909881",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:37.814Z",
+      "tip": "2026-10-28T23:00Z",
+      "leadMinutes": 228.36976666666666,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909882",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:37.859Z",
+      "tip": "2026-10-28T23:00Z",
+      "leadMinutes": 228.36901666666665,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909883",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:37.912Z",
+      "tip": "2026-10-28T23:00Z",
+      "leadMinutes": 228.36813333333333,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909884",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:37.986Z",
+      "tip": "2026-10-28T23:00Z",
+      "leadMinutes": 228.3669,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909885",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:38.031Z",
+      "tip": "2026-10-28T23:30Z",
+      "leadMinutes": 258.36615,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909886",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:38.075Z",
+      "tip": "2026-10-29T00:00Z",
+      "leadMinutes": 288.36541666666665,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909887",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:38.148Z",
+      "tip": "2026-10-29T00:00Z",
+      "leadMinutes": 288.3642,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909888",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:38.199Z",
+      "tip": "2026-10-29T00:00Z",
+      "leadMinutes": 288.36335,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909889",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:38.246Z",
+      "tip": "2026-10-29T00:00Z",
+      "leadMinutes": 288.3625666666667,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909890",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:38.324Z",
+      "tip": "2026-10-29T01:00Z",
+      "leadMinutes": 348.36126666666667,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909891",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:38.377Z",
+      "tip": "2026-10-29T01:30Z",
+      "leadMinutes": 378.36038333333335,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "401909892",
+      "date": "2026-10-28",
+      "at": "2026-10-28T19:11:38.426Z",
+      "tip": "2026-10-29T02:30Z",
+      "leadMinutes": 438.3595666666667,
+      "reportPublished": "2026-10-28T19:00:00.000Z"
+    }
+  ]
+}
