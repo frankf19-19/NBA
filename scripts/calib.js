@@ -26,6 +26,7 @@ const Availability=require('./availability-model.cjs');
 const ForecastAudit=require('./forecast-audit.cjs');
 const PregameObservations=require('./pregame-observations.cjs');
 const PregameTimingAudit=require('./pregame-timing-audit.cjs');
+const RoleStudy=require('./role-study.cjs');
 const BinShadow=require('./bin-shadow.cjs');
 const InjuryTime=require('./injury-report-time.cjs');
 const {JSDOM,VirtualConsole}=require('jsdom');
@@ -100,6 +101,23 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const F_OBSERVATIONS=path.join(D_SEED,`pregame-observations-${seasonNow0}.json`);
   let OBSERVATIONS=null,observationsWritable=true;
   try{if(fs.existsSync(F_OBSERVATIONS)){OBSERVATIONS=JSON.parse(fs.readFileSync(F_OBSERVATIONS,'utf8'));if(OBSERVATIONS.schema!==1||OBSERVATIONS.version!==PregameObservations.VERSION||OBSERVATIONS.season!==seasonNow0||!Array.isArray(OBSERVATIONS.observations))throw Error('Invalid archive header');}}catch(e){observationsWritable=false;console.error('賽前觀測檔無法解析，保留原檔:',e.message);}
+  // Locked role candidate has its own append-only file; formal PRE/LED fields are untouched.
+  const roleModel=readJSON(path.join(ROOT,'role-study-model.json'),null);
+  const roleFile=path.join(D_SEED,`role-study-${seasonNow0}.json`),roleStates=new Map();
+  let roleArchive=null,roleWritable=!!RoleStudy.parameters(roleModel);
+  try{if(roleWritable&&fs.existsSync(roleFile)){roleArchive=JSON.parse(fs.readFileSync(roleFile,'utf8'));if(roleArchive.schema!==1||roleArchive.version!==RoleStudy.VERSION||roleArchive.modelId!==roleModel.modelId||roleArchive.season!==seasonNow0||!Array.isArray(roleArchive.observations))throw Error('Invalid role archive header');}}catch(e){roleWritable=false;console.error('角色研究檔保留原檔:',e.message);}
+  const saveRoleObservation=(g,pg,f,d)=>{
+    if(!roleWritable)return;
+    try{
+      const quality=E('QUALITY_MODEL');
+      if(!Quality.valid(quality,d)||quality.selection?.name!=='regress3')return;
+      const key=quality.trainedThrough+'|'+seasonNow0;
+      if(!roleStates.has(key))roleStates.set(key,RoleStudy.prepare(LED,quality.trainedThrough,seasonNow0));
+      const record=RoleStudy.forecast(roleModel,quality,roleStates.get(key),g,f,pg,d);
+      const next=RoleStudy.append(roleArchive,record);if(!record||next===roleArchive)return;
+      fs.writeFileSync(roleFile+'.tmp',JSON.stringify(next));fs.renameSync(roleFile+'.tmp',roleFile);roleArchive=next;
+    }catch(e){roleWritable=false;try{fs.unlinkSync(roleFile+'.tmp');}catch(ignore){}console.error('角色研究略過，保留正式預測:',e.message);}
+  };
   const saveObservation=(g,pg,d)=>{
     if(!observationsWritable)return;
     try{
@@ -674,12 +692,14 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           bpi:(bp&&!bp.x)?bp.pd:null,bpiP:(bp&&!bp.x)?bp.hp:null,
           k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString(),u:2};preN++;
         saveObservation(g,PRE[g.id],d);
+        saveRoleObservation(g,PRE[g.id],p.f,d);
       }
       E('INJ_READY=false');
     }
     /* 已入紀錄簿但當時沒附賽前預測的,補附 */
     for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip,qv:pg.qv,qn:pg.qn,baseMargin:pg.baseMargin,injAlt:pg.injAlt,robustShadow:pg.robustShadow??null,injOfficial:pg.injOfficial??null,availabilityShadow:pg.availabilityShadow??null,binShadow:pg.binShadow??null};}}
     fs.writeFileSync(F_PRE,JSON.stringify(PRE));
+    if(roleWritable)fs.writeFileSync('role-study-audit.json',JSON.stringify({...RoleStudy.score(LED,roleArchive),modelId:roleModel.modelId,generatedAt:new Date().toISOString()}));
     if(observationsWritable)fs.writeFileSync('pregame-timing-audit.json',JSON.stringify({...PregameTimingAudit.build(LED,OBSERVATIONS),generatedAt:new Date().toISOString()}));
     if(binArtifact?.version===BinShadow.VERSION){binArtifact.capture={at:new Date().toISOString(),games:binCaptured};fs.writeFileSync(F_BIN_SHADOW,JSON.stringify(binArtifact));}
     if(availabilityArtifact?.version===Availability.VERSION){availabilityArtifact.capture={at:new Date().toISOString(),...availabilityCapture,scope:'official NBA only; report 0.5-6h before tip; ET 17:30-23:00; non-neutral regular season'};fs.writeFileSync(F_AVAILABILITY,JSON.stringify(availabilityArtifact));console.log('出賽機率並行紀錄',JSON.stringify(availabilityArtifact.capture));}
@@ -798,4 +818,5 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   dom.window.close();
   process.exit(0);
 })().catch(e=>{console.error('校準失敗:',e);process.exit(1);});
+
 
