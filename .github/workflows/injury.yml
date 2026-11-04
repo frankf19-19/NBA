@@ -1,0 +1,30 @@
+name: 官方傷兵報告快速更新
+on:
+  schedule:
+    - cron: '*/20 14-23 * * *'  # 美東約 9:00–19:00(賽前),每 20 分鐘
+    - cron: '*/20 0-3 * * *'    # 美東約 19:00–23:00(西岸晚場)
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: nba-injury
+  cancel-in-progress: false
+jobs:
+  injury:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm install --no-save --no-package-lock --no-audit --no-fund pdf-parse@1.1.1
+      - run: node scripts/injury-latest.cjs
+      - name: 提交
+        run: |
+          git config user.name "injury-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add injury-latest.json 2>/dev/null || exit 0
+          git diff --cached --quiet && exit 0
+          git commit -m "官方傷兵報告更新 $(date -u +%FT%H:%MZ)"
+          for i in 1 2 3; do git pull --rebase origin main && git push && break; sleep 5; done

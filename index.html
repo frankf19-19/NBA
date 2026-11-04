@@ -1034,6 +1034,7 @@ const nameKey=n=>String(n||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').
 const officialNameAliases=Object.freeze({nicolasclaxton:'nicclaxton',kenyonmartin:'kjmartin'});
 const playerNameKey=n=>{const k=nameKey(String(n||'').replace(/\b(?:jr|sr|ii|iii|iv)\b\.?/gi,'').replace(/(?:Jr|Sr|III|II|IV)\.?\s*$/,''));return Object.hasOwn(officialNameAliases,k)?officialNameAliases[k]:k;};
 const officialTeamKey=n=>nameKey(n).replace(/^losangeles/,'la');
+let OFFICIAL_INJ=null;
 function applyOfficialInjuries(rows){
   const audit={version:'official-identity-v1',applied:0,matchedPlayers:0,unknownPlayers:0,ambiguousPlayers:0,unknownTeams:0,invalidStatuses:0};applyOfficialInjuries.audit=audit;
   if(!Array.isArray(rows)||!rows.length)return 0;
@@ -1534,6 +1535,11 @@ async function loadDay(quiet){
       try{const key=ids.slice().sort().join(',');
         if(INJ_CACHE.key===key&&Date.now()-INJ_CACHE.ts<600000)INJ=INJ_CACHE.v;else{INJ=await loadInjuries(ids);INJ_CACHE={key,ts:Date.now(),v:INJ};}
         INJ_READY=true;}catch(e){}
+      /* 官方傷兵報告(NBA 每 15 分鐘更新一版,雲端每 20 分鐘抓一次):以官方狀態覆寫 ESPN(ESPN 常停留在前一天) */
+      if(INJ_READY){try{const r=await fetch('injury-latest.json?t='+Math.floor(Date.now()/120000),{cache:'no-store'});
+        if(r.ok){const j=await r.json(),[y,m,dd]=date.split('-'),md=`${m}/${dd}/${y}`;
+          const rows=(j.rows||[]).filter(x=>x.d===md);
+          if(rows.length&&Date.now()-Date.parse(j.publishedAt)<36*3600e3){applyOfficialInjuries(rows);OFFICIAL_INJ={at:j.publishedAt,n:rows.length};}else OFFICIAL_INJ=null;}}catch(e){}}
     }
     if(requestId!==dayRequestId||date!==$('datePick').value)return;
     /* 已完賽:若雲端紀錄簿有「開打前凍結」的預測,顯示與統計一律以凍結值為準(不用賽後資料重算) */
@@ -2277,6 +2283,7 @@ function renderCalibHist(){
   if(INJ_READY){
     const isum=[];
     Object.keys(INJ).forEach(tid=>{const x=injInfo(+tid);if(x.adj<0&&x.names.length)isum.push(`${x.names[0].split('(')[0]} 等(${x.adj} 分)`);});
+    if(OFFICIAL_INJ)html+=`<div class="tag" style="margin-top:8px">📋 傷兵以 NBA 官方報告為準:美東 ${esc(new Date(OFFICIAL_INJ.at).toLocaleString('zh-TW',{timeZone:'America/New_York',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}))} 版(${OFFICIAL_INJ.n} 筆,每 20 分鐘自動更新)</div>`;
     if(isum.length)html+=`<div class="tag" style="margin-top:8px">今日傷兵已計入 ${isum.length} 隊:${esc(isum.slice(0,6).join('、'))}</div>`;
   }
   if(h.length){
