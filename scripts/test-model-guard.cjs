@@ -1,0 +1,10 @@
+'use strict';
+const G=require('./model-guard.cjs');const assert=require('assert');
+const mk=(days,per,fErr,bErr,noise)=>{const L=[];let i=0;for(let d=0;d<days;d++)for(let k=0;k<per;k++){const am=10;const s=((i++*7919)%11-5)*noise;L.push({sy:2027,st:2,po:0,d:'2026-11-'+String(d).padStart(2,'0'),am,pg:{u:2,qv:'q',mm:am-(fErr+((d%3)-1)*0.4)-s,baseMargin:am-bErr-s}});}return L;};
+let r=G.evaluate(mk(10,10,12,10,0.1),null,2027);assert.equal(r.mode,'formal');assert.match(r.reason,/未達門檻/);
+r=G.evaluate(mk(31,10,12,10,0.1),null,2027);assert.equal(r.mode,'base','正式明顯較差應切換');
+r=G.evaluate(mk(31,10,10,10,0.1),{mode:'base'},2027);assert.equal(r.mode,'formal','追上後換回');
+r=G.evaluate(mk(31,10,10.5,10,3),{mode:'base'},2027);assert.ok(['base','formal'].includes(r.mode));
+const L=mk(31,10,12,10,0.1);L.forEach(e=>{e.pg.qm=e.pg.baseMargin;});r=G.evaluate(L,null,2027);assert.equal(r.mode,'formal','qm 優先於 mm');
+const L2=mk(31,10,12,10,0.1);L2.forEach(e=>{e.pg.u=1;});assert.equal(G.rows(L2,2027).length,0,'未凍結不計');
+console.log('model-guard 測試通過');

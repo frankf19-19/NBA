@@ -816,7 +816,7 @@ async function capturePlayerLines(maxN,since){
    機率表 MB 由雲端用近四季實戰的「預測分差 → 實際落點」統計學得(常態分布會低估 6–10 與 26+ 的機率,實測全中率較差),
    每日以滾動回測與常態法比較後自動選用;沒有雲端表時退回常態分布。索引 0–5 = 主隊贏該區間、6–11 = 客隊贏該區間 */
 let MB=null;
-let MARGIN_MODEL=null,QUALITY_MODEL=null;
+let MARGIN_MODEL=null,QUALITY_MODEL=null,MODEL_GUARD=null;   /* MODEL_GUARD:正式模型自動把關結果(scripts/model-guard.cjs) */
 function qualityAllowed(date){
   return !!(window.NBAQuality?.valid(QUALITY_MODEL,date)&&PRM.tb===false
     &&![PRM.mk,PRM.mkb,PRM.mk3,PRM.ref].some(x=>x&&x.use));
@@ -1160,8 +1160,10 @@ function predict(g,pm,lg,date){
   const mid=(expHome+expAway)/2,half=marginPre/2*MARGIN_K*phm;
   expHome=mid+half;expAway=mid-half;
   const incumbentPre=expHome-expAway;
-  const qualityPoint=qualityAllowed(distributionDate)?window.NBAQuality.forecast(QUALITY_MODEL,g,fvec,distributionDate):null;
-  const qualityShift=qualityPoint?qualityPoint.margin-incumbentPre:0;
+  const qualityCand=qualityAllowed(distributionDate)?window.NBAQuality.forecast(QUALITY_MODEL,g,fvec,distributionDate):null;
+  /* 自動把關判定正式模型明顯較差時改用舊版公式;仍保留正式模型分差(qualityMargin)供持續比較 */
+  const qualityPoint=qualityCand&&!(MODEL_GUARD&&MODEL_GUARD.mode==='base')?qualityCand:null;
+  const qualityShift=qualityPoint?qualityPoint.margin-incumbentPre:0,qualityShiftCand=qualityCand?qualityCand.margin-incumbentPre:0;
   if(qualityPoint){expHome=mid+qualityPoint.margin/2;expAway=mid-qualityPoint.margin/2;factors.push('對手強度與投籃波動修正');}
   // 傷兵修正(僅今天以後;官方名單 + 缺陣者場均得分 × 係數):以最終分數直接加在 K 與季內乘數之後——
   // 舊版加在乘數之前,開季時被 0.64 再打折,三名主力缺陣只剩 −2.3 分,明顯低估
@@ -1243,7 +1245,7 @@ function predict(g,pm,lg,date){
     margin:Math.abs(margin),raw_margin:margin,raw_margin_pre:marginPre,why,factors,f:fvec,
     mb:mb.i,mbp:mb.p,mbProbs:mb.probs,mbSrc:mb.src,mk:Number.isFinite(g._mk)?g._mk:null,bpi:Number.isFinite(g._bpi)?g._bpi:null,model_margin:modelMargin,sigma:sigUse,
     shadow,marginInterval,distributionVersion:joint?jointArtifact.version:null,
-    qualityVersion:qualityPoint?.version||null,qualityName:qualityPoint?.name||null,baseMargin:margin-qualityShift,injuryAlternativeMargin,
+    qualityVersion:qualityPoint?.version||null,qualityName:qualityPoint?.name||null,baseMargin:margin-qualityShift,qualityMargin:qualityCand?margin-qualityShift+qualityShiftCand:null,injuryAlternativeMargin,
     injHit:!!(injTxt),restAdjusted:(rH!=null&&rA!=null),moAdjusted:(mH!=null&&mA!=null)};
 }
 /* 以紀錄簿凍結值覆寫顯示用預測:最終分差 mm、區間 mb、當時盤口 mk */
@@ -2139,7 +2141,8 @@ async function loadCloud(){
   }catch(e){}
   await Promise.all([
     jget('margin-model.json?t='+Math.floor(Date.now()/600000)).then(x=>MARGIN_MODEL=x).catch(()=>MARGIN_MODEL=null),
-    jget('quality-model.json?t='+Math.floor(Date.now()/600000)).then(x=>QUALITY_MODEL=x).catch(()=>QUALITY_MODEL=null)
+    jget('quality-model.json?t='+Math.floor(Date.now()/600000)).then(x=>QUALITY_MODEL=x).catch(()=>QUALITY_MODEL=null),
+    jget('model-guard.json?t='+Math.floor(Date.now()/600000)).then(x=>MODEL_GUARD=x).catch(()=>MODEL_GUARD=null)
   ]);
   renderFooter();
   try{
@@ -2283,6 +2286,7 @@ function renderCalibHist(){
   if(INJ_READY){
     const isum=[];
     Object.keys(INJ).forEach(tid=>{const x=injInfo(+tid);if(x.adj<0&&x.names.length)isum.push(`${x.names[0].split('(')[0]} 等(${x.adj} 分)`);});
+    if(MODEL_GUARD)html+=`<div class="tag" style="margin-top:8px">🛡 模型自動把關:正式模型 vs 舊版公式,同場賽前預測已比較 ${MODEL_GUARD.dates} 個比賽日、${MODEL_GUARD.games} 場(門檻 ${MODEL_GUARD.rule.minDates} 日 / ${MODEL_GUARD.rule.minGames} 場)${MODEL_GUARD.meanDiff!=null?`,正式模型平均每場${MODEL_GUARD.meanDiff>0?'多':'少'}錯 ${Math.abs(MODEL_GUARD.meanDiff).toFixed(2)} 分`:''}。目前採用:${MODEL_GUARD.mode==='base'?'舊版公式':'正式模型'}(${esc(MODEL_GUARD.reason)})</div>`;
     if(OFFICIAL_INJ)html+=`<div class="tag" style="margin-top:8px">📋 傷兵以 NBA 官方報告為準:美東 ${esc(new Date(OFFICIAL_INJ.at).toLocaleString('zh-TW',{timeZone:'America/New_York',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}))} 版(${OFFICIAL_INJ.n} 筆,每 20 分鐘自動更新)</div>`;
     if(isum.length)html+=`<div class="tag" style="margin-top:8px">今日傷兵已計入 ${isum.length} 隊:${esc(isum.slice(0,6).join('、'))}</div>`;
   }

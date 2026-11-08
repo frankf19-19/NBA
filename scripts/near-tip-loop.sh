@@ -22,7 +22,7 @@ while [ "$(date +%s)" -lt "$END" ]; do
     if [ "$(calib_running)" != "0" ]; then echo "完整校準執行中,這輪跳過重算";
     else
       NBA_FAST_REFRESH=1 timeout 15m node scripts/calib.js > /tmp/calib.log 2>&1; echo "重算結束 code=$?"; tail -5 /tmp/calib.log
-      git add -A calib.json pdb.json margin-model.json quality-model.json robust-shadow.json availability-shadow.json bin-shadow.json forecast-audit.json pregame-timing-audit.json role-study-audit.json seed injury-latest.json 2>/dev/null
+      git add -A calib.json pdb.json margin-model.json quality-model.json robust-shadow.json availability-shadow.json bin-shadow.json forecast-audit.json pregame-timing-audit.json role-study-audit.json model-guard.json seed injury-latest.json 2>/dev/null
       git add -u; push_it "臨場重算(開打前) $(date -u +%FT%H:%MZ)"
     fi
   fi
