@@ -1,1 +1,1 @@
-{"schema":1,"version":"model-guard-v1","rule":{"minDates":30,"minGames":300,"switchT":2,"backT":0.5,"version":"model-guard-v1"},"fromSeason":2027,"mode":"formal","reason":"樣本未達門檻,維持正式模型","dates":10,"games":75,"meanDiff":0.802,"t":2.29,"changedAt":null}
+{"schema":1,"version":"model-guard-v1","rule":{"minDates":30,"minGames":300,"switchT":2,"backT":0.5,"version":"model-guard-v1"},"fromSeason":2027,"mode":"formal","reason":"樣本未達門檻,維持正式模型","dates":11,"games":81,"meanDiff":0.586,"t":1.53,"changedAt":null}
