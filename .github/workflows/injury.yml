@@ -1,8 +1,7 @@
 name: 官方傷兵報告快速更新
 on:
   schedule:
-    - cron: '*/20 14-23 * * *'  # 美東約 9:00–19:00(賽前),每 20 分鐘
-    - cron: '*/20 0-3 * * *'    # 美東約 19:00–23:00(西岸晚場)
+    - cron: '*/20 12-15 * * *'  # 美東早上;下午到深夜由「臨場傷兵與預測重算」接手
   workflow_dispatch:
 permissions:
   contents: write

@@ -61,7 +61,7 @@ jobs:
           git add -u
           git diff --cached --quiet && exit 0
           git commit -m "每日自動校準 $(date -u +%F)"
-          git pull --rebase origin main
+          git pull --rebase -X theirs origin main
           git push
 
 
