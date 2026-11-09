@@ -275,7 +275,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
           if(x.f)e.f=JSON.parse(JSON.stringify(x.f));
           if(e.d>=BUBBLE[0]&&e.d<BUBBLE[1])e.nu=1;
           if(x.hs!=null){e.hs=x.hs;e.as=x.as;}
-          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip,qv:pg.qv,qn:pg.qn,baseMargin:pg.baseMargin,qm:pg.qm??null,injAlt:pg.injAlt,robustShadow:pg.robustShadow??null,injOfficial:pg.injOfficial??null,availabilityShadow:pg.availabilityShadow??null,binShadow:pg.binShadow??null};   /* 賽前(含當日傷兵)預測,凍結 */
+          const pg=PRE[e.id];if(pg&&pg.m!=null)e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip,qv:pg.qv,qn:pg.qn,baseMargin:pg.baseMargin,qm:pg.qm??null,pmm:pg.pmm??null,pm0:pg.pm0??null,injAlt:pg.injAlt,robustShadow:pg.robustShadow??null,injOfficial:pg.injOfficial??null,availabilityShadow:pg.availabilityShadow??null,binShadow:pg.binShadow??null};   /* 賽前(含當日傷兵)預測,凍結 */
           return e;});
         if(fresh.length){fresh.forEach(e=>{have.add(e.id);haveKey.add(e.d+'|'+e.hid+'|'+e.aid);insertSorted(LED,e);byId.set(e.id,e);});added+=fresh.length;sAdd+=fresh.length;}
         return true;
@@ -494,6 +494,12 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
 
   try{const artifact=Quality.build(LED,{cutoff:today,season:seasonNow});if(artifact){fs.writeFileSync(F_QUALITY,JSON.stringify(artifact));E(`QUALITY_MODEL=${JSON.stringify(artifact)}`);console.log('點分差逐季驗證',JSON.stringify({enabled:artifact.enabled,choice:artifact.selection.name,recent:artifact.statistics.recent}));}}catch(e){console.error('點分差模型保留上一版:',e.message);}
 
+  /* 球員層實力模型(player-v1):逐季時間外驗證通過才啟用;失敗保留上一版 */
+  try{const PM=require('./player-model.cjs'),F_PLAYER=path.join(ROOT,'player-model.json');const pmA=PM.build(LED,{season:seasonNow});
+    if(pmA&&pmA.coef){fs.writeFileSync(F_PLAYER,JSON.stringify(pmA));E(`PLAYER_MODEL=${JSON.stringify(pmA)}`);
+      console.log('球員層實力',JSON.stringify({enabled:pmA.enabled,gate:pmA.gate,players:Object.keys(pmA.players).length}));}
+  }catch(e){console.error('球員層實力保留上一版:',e.message);const old=readJSON(path.join(ROOT,'player-model.json'),null);if(old)E(`PLAYER_MODEL=${JSON.stringify(old)}`);}
+
   /* 正式模型自動把關:事先寫死的門檻(30 個比賽日、300 場、t≥2),只用已完賽的凍結賽前預測 */
   try{const Guard=require('./model-guard.cjs'),F_GUARD=path.join(ROOT,'model-guard.json');
     const guard=Guard.evaluate(LED,readJSON(F_GUARD,null),2027);fs.writeFileSync(F_GUARD,JSON.stringify(guard));E(`MODEL_GUARD=${JSON.stringify(guard)}`);
@@ -694,7 +700,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
         const availabilityShadow=availabilityNew||(Availability.savedUsable(availabilityOld,g,d)?availabilityOld:null);
         if(availabilityNew){availabilityCapture.newGames++;availabilityCapture.newPlayers+=availabilityNew.rows.length;}else if(availabilityShadow)availabilityCapture.retainedGames++;
         PRE[g.id]={d,aw:g.away,hm:g.home,hid:g.homeId,aid:g.awayId,m:+p.raw_margin_pre.toFixed(2),mm:+p.raw_margin.toFixed(2),ih:+ih.adj,ia:+ia.adj,f:+inj.f,
-          binShadow,availabilityShadow,robustShadow,injOfficial:officialForDate?{publishedAt:officialForDate.publishedAt,url:officialForDate.url,matching:officialForDate.matching}:null,hn:ih.names,an:ia.names,p:p.home_prob,mb:p.mb,mbp:p.mbp,qv:p.qualityVersion,qn:p.qualityName,baseMargin:p.baseMargin,qm:Number.isFinite(p.qualityMargin)?+p.qualityMargin.toFixed(2):null,injAlt:p.injuryAlternativeMargin,q:p.mbProbs,interval:p.marginInterval??null,shadow:p.shadow??null,mv:p.distributionVersion??null,tip:g.startISO,mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
+          binShadow,availabilityShadow,robustShadow,injOfficial:officialForDate?{publishedAt:officialForDate.publishedAt,url:officialForDate.url,matching:officialForDate.matching}:null,hn:ih.names,an:ia.names,p:p.home_prob,mb:p.mb,mbp:p.mbp,qv:p.qualityVersion,qn:p.qualityName,baseMargin:p.baseMargin,qm:Number.isFinite(p.qualityMargin)?+p.qualityMargin.toFixed(2):null,pmm:Number.isFinite(p.playerMargin)?+p.playerMargin.toFixed(2):null,pm0:Number.isFinite(p.prevMargin)?+p.prevMargin.toFixed(2):null,injAlt:p.injuryAlternativeMargin,q:p.mbProbs,interval:p.marginInterval??null,shadow:p.shadow??null,mv:p.distributionVersion??null,tip:g.startISO,mk:info.mk??null,ou:info.ou??null,of:info.of||[],ofo:ofo||null,
           bpi:(bp&&!bp.x)?bp.pd:null,bpiP:(bp&&!bp.x)?bp.hp:null,
           k:+E('MARGIN_K'),s:+E('RUN_SIGMA'),at:new Date().toISOString(),u:2};preN++;
         saveObservation(g,PRE[g.id],d);
@@ -703,7 +709,7 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
       E('INJ_READY=false');
     }
     /* 已入紀錄簿但當時沒附賽前預測的,補附 */
-    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip,qv:pg.qv,qn:pg.qn,baseMargin:pg.baseMargin,qm:pg.qm??null,injAlt:pg.injAlt,robustShadow:pg.robustShadow??null,injOfficial:pg.injOfficial??null,availabilityShadow:pg.availabilityShadow??null,binShadow:pg.binShadow??null};}}
+    for(const e of LED){if(!e.pg&&PRE[e.id]&&PRE[e.id].m!=null){const pg=PRE[e.id];e.pg={m:pg.m,mm:pg.mm??null,mb:pg.mb??null,mk:pg.mk??null,ih:pg.ih,ia:pg.ia,f:pg.f,p:pg.p,k:pg.k,s:pg.s,at:pg.at,u:pg.u||1,mbp:pg.mbp,q:pg.q,interval:pg.interval,shadow:pg.shadow,mv:pg.mv,tip:pg.tip,qv:pg.qv,qn:pg.qn,baseMargin:pg.baseMargin,qm:pg.qm??null,pmm:pg.pmm??null,pm0:pg.pm0??null,injAlt:pg.injAlt,robustShadow:pg.robustShadow??null,injOfficial:pg.injOfficial??null,availabilityShadow:pg.availabilityShadow??null,binShadow:pg.binShadow??null};}}
     fs.writeFileSync(F_PRE,JSON.stringify(PRE));
     if(roleWritable)fs.writeFileSync('role-study-audit.json',JSON.stringify({...RoleStudy.score(LED,roleArchive),modelId:roleModel.modelId,generatedAt:new Date().toISOString()}));
     if(observationsWritable)fs.writeFileSync('pregame-timing-audit.json',JSON.stringify({...PregameTimingAudit.build(LED,OBSERVATIONS),generatedAt:new Date().toISOString()}));

@@ -816,7 +816,25 @@ async function capturePlayerLines(maxN,since){
    機率表 MB 由雲端用近四季實戰的「預測分差 → 實際落點」統計學得(常態分布會低估 6–10 與 26+ 的機率,實測全中率較差),
    每日以滾動回測與常態法比較後自動選用;沒有雲端表時退回常態分布。索引 0–5 = 主隊贏該區間、6–11 = 客隊贏該區間 */
 let MB=null;
-let MARGIN_MODEL=null,QUALITY_MODEL=null,MODEL_GUARD=null;   /* MODEL_GUARD:正式模型自動把關結果(scripts/model-guard.cjs) */
+let MARGIN_MODEL=null,QUALITY_MODEL=null,MODEL_GUARD=null,PLAYER_MODEL=null;
+/* 球員層實力(player-v1,雲端 scripts/player-model.cjs 逐季時間外驗證通過才啟用):依「誰會上場」計算兩隊實力。
+   上場機率依傷兵狀態;預期上場時間依該球員近期輪換;陣容以球員資料庫的現屬球隊為準。 */
+function playProb(st){st=String(st||'');if(/out|suspen/i.test(st))return 0;if(/doubt/i.test(st))return .05;if(/question|day/i.test(st))return .55;if(/probable/i.test(st))return .92;return 1;}
+function playerStrength(tid,avail){
+  const M=PLAYER_MODEL;if(!M||!M.players)return null;let tot=0;const ws=[];
+  for(const id in M.players){const p=M.players[id],cur=PDB.players&&PDB.players[id];const team=cur&&cur.tid?+cur.tid:+p.t;if(team!==+tid)continue;
+    const pr=avail&&avail[id]!=null?avail[id]:1,em=p.em*pr;if(em>0){ws.push([p,em]);tot+=em;}}
+  if(tot<150)return null;const sc=240/tot;let s=0,b=0;for(const [p,em] of ws){s+=em*sc*p.r;b+=em*sc*p.b;}return [s/5,b/5];
+}
+function playerMargin(g,marginPre,date,useInj){
+  const M=PLAYER_MODEL;if(!M||!M.enabled||!Array.isArray(M.coef)||M.season!==seasonOf(date))return null;
+  if(MODEL_GUARD&&MODEL_GUARD.player&&MODEL_GUARD.player.mode==='off')return null;
+  const avail={};let outs=[];
+  if(useInj)[g.homeId,g.awayId].forEach(t=>(INJ[t]||[]).forEach(x=>{if(x.id){const pr=playProb(x.status);avail[x.id]=pr;if(pr<1&&M.players[x.id])outs.push(x.name);}}));
+  const h=playerStrength(g.homeId,avail),a=playerStrength(g.awayId,avail);if(!h||!a)return null;
+  const c=M.coef,margin=c[0]+c[1]*(h[0]-a[0])+c[2]*(h[1]-a[1])+c[3]*marginPre;
+  return Number.isFinite(margin)?{margin,dpm:h[0]-a[0],dbox:h[1]-a[1],outs}:null;
+}   /* MODEL_GUARD:正式模型自動把關結果(scripts/model-guard.cjs) */
 function qualityAllowed(date){
   return !!(window.NBAQuality?.valid(QUALITY_MODEL,date)&&PRM.tb===false
     &&![PRM.mk,PRM.mkb,PRM.mk3,PRM.ref].some(x=>x&&x.use));
@@ -1198,6 +1216,11 @@ function predict(g,pm,lg,date){
   }
 
   let margin=expHome-expAway;
+  /* 球員層:以預計上場陣容取代球隊整體評分與傷兵扣分(傷兵已反映在陣容),只用於非中立場的正規比賽 */
+  const prevMargin=margin;let playerTxt='';
+  const pmx=!neutralGame&&g.stype!==1?playerMargin(g,marginPre,date,!!(INJ_READY&&date&&date>=etToday())):null;
+  if(pmx){margin=pmx.margin;const mid1=(expHome+expAway)/2;expHome=mid1+margin/2;expAway=mid1-margin/2;
+    playerTxt=`球員層實力(逐季驗證通過):依預計上場陣容與各球員近期正負值、攻擊產出計算${pmx.outs.length?`(已扣除/折算:${pmx.outs.slice(0,4).join('、')})`:''},主隊陣容正負值 ${pmx.dpm>=0?'+':''}${pmx.dpm.toFixed(1)}、產出 ${pmx.dbox>=0?'+':''}${pmx.dbox.toFixed(1)},最終分差 ${P1(margin)} 分(原球隊模型 ${P1(prevMargin)} 分)。`;factors.push('球員層陣容實力');}
   const modelMargin=margin;
   /* 市場盤口對照:有盤口且雲端驗證有效時,最終分差 = w × 模型 + (1−w) × 市場 */
   let mkTxt='';
@@ -1236,7 +1259,7 @@ function predict(g,pm,lg,date){
   if(hOff.usedRec||hDef.usedRec)recBits.push(`主隊近10場 得${r1(H.rPFg)} 失${r1(H.rPAg)}`);
   if(aOff.usedRec||aDef.usedRec)recBits.push(`客隊近10場 得${r1(A.rPFg)} 失${r1(A.rPAg)}`);
   if(recBits.length){why+=`近況已納入:${recBits.join('、')}。`;factors.unshift('近10場走勢');}
-  why+=priorTxt+(useEff?effTxt:'')+restTxt+moTxt+h2hTxt+injTxt+phTxt+biasTxt+mkTxt+refTxt;
+  why+=priorTxt+(useEff?effTxt:'')+restTxt+moTxt+h2hTxt+injTxt+phTxt+biasTxt+mkTxt+refTxt+playerTxt;
   if(qualityPoint)why+=`正式點分差採用${qualityPoint.name==='regress3'?'三分與罰球波動校正':qualityPoint.name==='raw'?'對手校正實力評分':'歷史選模'}:原模型主隊 ${P1(incumbentPre)} 分,新模型 ${P1(qualityPoint.margin)} 分(傷兵另計)。原模型的 K 與季內乘數僅作對照,未重複套入新評分。`;
   why+=`基準主場 ${PTS(gameHca)} 分${PRM.src==='cloud'?'(由歷年資料學得)':''},修正後得分期望 ${expAway.toFixed(1)}:${expHome.toFixed(1)}(客:主),預期 ${fav} 贏約 ${r1(Math.abs(margin))} 分。`;
   if(Math.abs(margin)<2)why+=`分差不到 2 分,實質接近五五波。`;
@@ -1245,7 +1268,7 @@ function predict(g,pm,lg,date){
     margin:Math.abs(margin),raw_margin:margin,raw_margin_pre:marginPre,why,factors,f:fvec,
     mb:mb.i,mbp:mb.p,mbProbs:mb.probs,mbSrc:mb.src,mk:Number.isFinite(g._mk)?g._mk:null,bpi:Number.isFinite(g._bpi)?g._bpi:null,model_margin:modelMargin,sigma:sigUse,
     shadow,marginInterval,distributionVersion:joint?jointArtifact.version:null,
-    qualityVersion:qualityPoint?.version||null,qualityName:qualityPoint?.name||null,baseMargin:margin-qualityShift,qualityMargin:qualityCand?margin-qualityShift+qualityShiftCand:null,injuryAlternativeMargin,
+    qualityVersion:qualityPoint?.version||null,qualityName:qualityPoint?.name||null,baseMargin:prevMargin-qualityShift,qualityMargin:qualityCand?prevMargin-qualityShift+qualityShiftCand:null,playerMargin:pmx?margin:null,prevMargin,injuryAlternativeMargin,
     injHit:!!(injTxt),restAdjusted:(rH!=null&&rA!=null),moAdjusted:(mH!=null&&mA!=null)};
 }
 /* 以紀錄簿凍結值覆寫顯示用預測:最終分差 mm、區間 mb、當時盤口 mk */
@@ -2142,7 +2165,8 @@ async function loadCloud(){
   await Promise.all([
     jget('margin-model.json?t='+Math.floor(Date.now()/600000)).then(x=>MARGIN_MODEL=x).catch(()=>MARGIN_MODEL=null),
     jget('quality-model.json?t='+Math.floor(Date.now()/600000)).then(x=>QUALITY_MODEL=x).catch(()=>QUALITY_MODEL=null),
-    jget('model-guard.json?t='+Math.floor(Date.now()/600000)).then(x=>MODEL_GUARD=x).catch(()=>MODEL_GUARD=null)
+    jget('model-guard.json?t='+Math.floor(Date.now()/600000)).then(x=>MODEL_GUARD=x).catch(()=>MODEL_GUARD=null),
+    jget('player-model.json?t='+Math.floor(Date.now()/600000)).then(x=>PLAYER_MODEL=x).catch(()=>PLAYER_MODEL=null)
   ]);
   renderFooter();
   try{
@@ -2287,6 +2311,7 @@ function renderCalibHist(){
     const isum=[];
     Object.keys(INJ).forEach(tid=>{const x=injInfo(+tid);if(x.adj<0&&x.names.length)isum.push(`${x.names[0].split('(')[0]} 等(${x.adj} 分)`);});
     if(MODEL_GUARD)html+=`<div class="tag" style="margin-top:8px">🛡 模型自動把關:正式模型 vs 舊版公式,同場賽前預測已比較 ${MODEL_GUARD.dates} 個比賽日、${MODEL_GUARD.games} 場(門檻 ${MODEL_GUARD.rule.minDates} 日 / ${MODEL_GUARD.rule.minGames} 場)${MODEL_GUARD.meanDiff!=null?`,正式模型平均每場${MODEL_GUARD.meanDiff>0?'多':'少'}錯 ${Math.abs(MODEL_GUARD.meanDiff).toFixed(2)} 分`:''}。目前採用:${MODEL_GUARD.mode==='base'?'舊版公式':'正式模型'}(${esc(MODEL_GUARD.reason)})</div>`;
+    if(PLAYER_MODEL&&PLAYER_MODEL.gate)html+=`<div class="tag" style="margin-top:8px">👥 球員層陣容實力:${PLAYER_MODEL.enabled&&!(MODEL_GUARD&&MODEL_GUARD.player&&MODEL_GUARD.player.mode==='off')?'已啟用':'未啟用'}。過去 ${PLAYER_MODEL.gate.seasons} 季時間外驗證,平均每場誤差${PLAYER_MODEL.gate.improve>=0?'減少':'增加'} ${Math.abs(PLAYER_MODEL.gate.improve).toFixed(2)} 分、${PLAYER_MODEL.gate.improvedSeasons} 季進步、勝負命中 ${PLAYER_MODEL.gate.winnerDiff>=0?'+':''}${(PLAYER_MODEL.gate.winnerDiff*100).toFixed(1)}%${MODEL_GUARD&&MODEL_GUARD.player?`;實戰把關已比較 ${MODEL_GUARD.player.dates} 日 / ${MODEL_GUARD.player.games} 場`:''}</div>`;
     if(OFFICIAL_INJ)html+=`<div class="tag" style="margin-top:8px">📋 傷兵以 NBA 官方報告為準:美東 ${esc(new Date(OFFICIAL_INJ.at).toLocaleString('zh-TW',{timeZone:'America/New_York',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}))} 版(${OFFICIAL_INJ.n} 筆,每 20 分鐘自動更新)</div>`;
     if(isum.length)html+=`<div class="tag" style="margin-top:8px">今日傷兵已計入 ${isum.length} 隊:${esc(isum.slice(0,6).join('、'))}</div>`;
   }

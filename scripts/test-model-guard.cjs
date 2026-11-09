@@ -7,4 +7,6 @@ r=G.evaluate(mk(31,10,10,10,0.1),{mode:'base'},2027);assert.equal(r.mode,'formal
 r=G.evaluate(mk(31,10,10.5,10,3),{mode:'base'},2027);assert.ok(['base','formal'].includes(r.mode));
 const L=mk(31,10,12,10,0.1);L.forEach(e=>{e.pg.qm=e.pg.baseMargin;});r=G.evaluate(L,null,2027);assert.equal(r.mode,'formal','qm 優先於 mm');
 const L2=mk(31,10,12,10,0.1);L2.forEach(e=>{e.pg.u=1;});assert.equal(G.rows(L2,2027).length,0,'未凍結不計');
+const L3=mk(31,10,10,10,0.1);L3.forEach((e,i)=>{e.pg.pm0=e.am-10+((i%7)-3)*0.1;e.pg.pmm=e.am-13-((i%5))*0.2;});r=G.evaluate(L3,null,2027);assert.equal(r.player.mode,'off','球員層明顯較差應關閉');
+r=G.evaluate(mk(5,5,10,10,0.1),null,2027);assert.equal(r.player.mode,'on','無資料維持啟用');
 console.log('model-guard 測試通過');
