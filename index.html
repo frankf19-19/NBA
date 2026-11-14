@@ -357,6 +357,20 @@
   .pk-mb{margin-left:auto;font-family:var(--mono);font-weight:600;font-size:13.5px;color:var(--amber);border:1px solid var(--amber);border-radius:999px;padding:1px 10px;white-space:nowrap}
   .pk-sub{font-size:12.5px;color:var(--muted);margin-top:3px} .pk-sub b{color:var(--ink2);font-family:var(--mono)}
   .why.slim{border-top:none;margin-top:8px;padding-top:0}
+  .absent{margin-top:10px;border:1px solid rgba(239,95,95,.45);border-radius:9px;background:rgba(239,95,95,.06);padding:8px 10px}
+  .absent.ok{border-color:var(--line);background:none;color:var(--muted);font-size:12.5px;padding:6px 10px}
+  .ab-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-bottom:6px}
+  .ab-head b{font-family:var(--cond);font-size:13.5px;letter-spacing:.08em;color:var(--miss)}
+  .ab-row{display:flex;gap:8px;align-items:flex-start;margin-top:5px}
+  .ab-tm{flex:0 0 64px;font-weight:700;font-size:13px;padding-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ab-list{display:flex;flex-wrap:wrap;gap:5px;min-width:0;align-items:center}
+  .ab-chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:12.5px;white-space:nowrap;cursor:pointer}
+  .ab-chip.out{background:var(--miss);color:#fff;font-weight:700}
+  .ab-chip.out:not(.key){background:rgba(239,95,95,.16);color:var(--miss);font-weight:500}
+  .ab-chip.q{background:rgba(255,194,71,.22);color:var(--ink2);border:1px solid rgba(255,194,71,.7)}
+  .ab-chip.key{font-size:13.5px} .ab-chip i{font-style:normal;font-family:var(--mono);font-size:11.5px;opacity:.9}
+  .ab-chip.mini{font-size:10.5px;padding:0 6px;margin-right:4px;cursor:default;font-weight:600}
+  .ab-more{font-size:12px;color:var(--muted)}
   .apts{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
   .apts li{font-size:13.5px;line-height:1.6;color:var(--ink2);padding-left:46px;position:relative}
   .ak{position:absolute;left:0;top:2px;font-family:var(--cond);font-weight:700;font-size:11.5px;letter-spacing:.04em;width:38px;text-align:center;border-radius:5px;padding:1px 0;background:var(--wash2);color:var(--teal)}
@@ -501,7 +515,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.5.3 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.6.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
 </div>
 
 <script src="scripts/game-context.js?v=1"></script>
@@ -1497,6 +1511,22 @@ function analysisPoints(g,p,date){
   if(Number.isFinite(g._mk)&&Math.abs(m-g._mk)>=4)add('分歧',`我們的模型(主隊 ${P1(m)} 分)和市場(主隊 ${P1(g._mk)} 分)差了 ${Math.abs(m-g._mk).toFixed(1)} 分;這類分歧大的比賽不確定性較高(盤口只供對照,沒有混入預測)。`,2.7);
   return out.sort((x,y)=>y.w-x.w);
 }
+
+/* 缺陣名單(v3.6):確定不上場的球員用紅色標籤直接列在卡片上,依場均得分排序;出賽成疑另以黃色標示 */
+function absentHtml(g,date){
+  if(!INJ_READY||!date||date<etToday())return '';
+  const row=(tid,nm)=>{
+    const list=(INJ[tid]||[]).map(x=>{const pd=PDB.players&&PDB.players[x.id];return {id:x.id,n:x.name,st:String(x.status||''),pts:pd&&pd.pts!=null?+pd.pts:(+x.pts||0),min:pd&&pd.min!=null?+pd.min:0};});
+    const out=list.filter(x=>/out|suspen|doubt/i.test(x.st)).sort((a,b)=>b.pts-a.pts),q=list.filter(x=>/question|day/i.test(x.st)).sort((a,b)=>b.pts-a.pts);
+    const key=x=>x.pts>=8||x.min>=18,last=n=>{const a=String(n).split(' ');return a.length>1?a.slice(1).join(' '):n;};
+    const chip=(x,c)=>`<span class="ab-chip ${c}${key(x)?' key':''}"${x.id?` data-pid="${x.id}"`:''}>${c==='out'?'✕':'?'} ${esc(key(x)?x.n:last(x.n))}${x.pts>=8?`<i>${x.pts.toFixed(1)}</i>`:''}</span>`;
+    const outKey=out.filter(key),outRest=out.length-outKey.length,qKey=q.filter(key);
+    if(!outKey.length&&!qKey.length&&!outRest)return '';
+    return `<div class="ab-row"><span class="ab-tm">${esc(nm)}</span><span class="ab-list">${outKey.map(x=>chip(x,'out')).join('')}${qKey.map(x=>chip(x,'q')).join('')}${outRest?`<span class="ab-more">${outKey.length?'另 ':''}${outRest} 名替補缺陣</span>`:''}${!outKey.length&&!outRest?'':''}</span></div>`;};
+  const a=row(g.awayId,shortTeam(g.away)),h=row(g.homeId,shortTeam(g.home));
+  if(!a&&!h)return `<div class="absent ok">✓ 兩隊目前沒有主力缺陣</div>`;
+  return `<div class="absent"><div class="ab-head"><b>缺陣名單</b><span><span class="ab-chip out mini">✕ 確定不打</span><span class="ab-chip q mini">? 出賽成疑</span>數字為場均得分</span></div>${a}${h}</div>`;
+}
 function gameCard(g,p,rv){
   const hp=Math.round(p.home_prob*100),ap=100-hp;
   const hasScore=p.home_score_pred!=null,isFinal=g.status==='Final',isLive=g.status==='Live';
@@ -1579,6 +1609,7 @@ function gameCard(g,p,rv){
   return `<div class="game ${isFinal?'done':''}" data-game="${g.id}">
     <div class="g-top">${teamsHtml}${pill}${gdayBtn}</div>
     ${metaTop?`<div class="meta">${metaTop}</div>`:''}
+    ${absentHtml(g,$('datePick').value)}
     ${liveRow}
     ${pickBar}
     ${mbHtml}
@@ -2372,7 +2403,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.5.3 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
+  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.6.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
