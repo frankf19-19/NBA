@@ -501,7 +501,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.4.1 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.4.2 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
 </div>
 
 <script src="scripts/game-context.js?v=1"></script>
@@ -890,7 +890,7 @@ function playerMargin(g,marginPre,date,useInj){
     const outs=(INJ[tid]||[]).filter(x=>useInj&&x.id&&M.players[x.id]&&playProb(x.status)<1).map(x=>{const alt=Object.assign({},avail);alt[x.id]=1;const w=playerTeamVal(tid,alt);
       return {n:x.name,st:x.status,imp:w?now.v-w.v:0,fresh:M.players[x.id].ep!=null};}).sort((x,y)=>x.imp-y.imp);
     const top=Object.keys(M.players).filter(id=>{const q=M.players[id],pd=PDB.players&&PDB.players[id];return (pd&&pd.tid?+pd.tid:+q.t)===+tid&&(avail[id]==null||avail[id]>=.5)&&q.em>=18;})
-      .map(id=>({n:(PDB.players[id]||{}).n||'',v:M.players[id].em*(c[1]*M.players[id].r+c[2]*M.players[id].b)})).filter(x=>x.n).sort((x,y)=>y.v-x.v).slice(0,2).map(x=>x.n);
+      .map(id=>{const alt=Object.assign({},avail);alt[id]=0;const w=playerTeamVal(tid,alt);return {n:(PDB.players[id]||{}).n||'',imp:w?w.v-now.v:0};}).filter(x=>x.n).sort((x,y)=>x.imp-y.imp).slice(0,2);   /* 每位球員各自的份量:少了他,球隊差幾分(依他自己的正負值、產出與上場時間) */
     return {imp:now.v-full.v,shock:now.shock,outs,top};};
   return Number.isFinite(margin)?{margin,dpm:h.cur[0]-a.cur[0],dbox:h.cur[1]-a.cur[1],outs,lineup:{h:side(g.homeId,h),a:side(g.awayId,a)}}:null;
 }   /* MODEL_GUARD:正式模型自動把關結果(scripts/model-guard.cjs) */
@@ -1446,8 +1446,9 @@ function analysisPoints(g,p,date){
     const net=L.h.imp-L.a.imp;
     if(!L.h.outs.some(x=>x.imp<=-0.5)&&!L.a.outs.some(x=>x.imp<=-0.5))add('陣容','兩隊主力大致齊全,比的是原本實力。',1);
     else if(Math.abs(net)>=1.5)add('陣容',`傷兵淨影響:對 ${net>0?hN:aN} 有利約 ${Math.abs(net).toFixed(1)} 分。`,2.5+Math.abs(net));
-    const tops=[[aN,L.a.top],[hN,L.h.top]].filter(x=>x[1]&&x[1].length).map(x=>`${x[0]} 靠 ${x[1].join('、')}`);
-    if(tops.length)add('核心',`今天預計上場者中貢獻最大:${tops.join(';')}。`,0.8);
+    const tops=[[aN,L.a.top],[hN,L.h.top]].filter(x=>x[1]&&x[1].length).map(x=>`${x[0]} ${x[1].map(t=>`${t.n}(${Math.abs(t.imp).toFixed(1)} 分)`).join('、')}`);
+    const maxImp=Math.max(0,...[...(L.a.top||[]),...(L.h.top||[])].map(t=>Math.abs(t.imp)));
+    if(tops.length)add('核心',`每位球員份量不同——少了他球隊會差幾分:${tops.join(';')}。`,maxImp>=3?2.9:1.3);
   }
   /* 實力來源 */
   if(Number.isFinite(p.prevMargin)&&Number.isFinite(p.playerMargin)){
@@ -2338,7 +2339,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.4.1 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
+  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.4.2 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
