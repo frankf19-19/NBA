@@ -1440,7 +1440,7 @@ function analysisPoints(g,p,date){
     for(const [nm,sd] of [[aN,L.a],[hN,L.h]]){
       /* 只講真的有影響的缺陣(單人 ≥0.5 分);板凳末段缺陣的微小正負值是雜訊,不列 */
       const big=sd.outs.filter(x=>x.imp<=-0.5).slice(0,3);
-      if(big.length&&sd.imp<=-0.7)add('傷兵',`${nm} ${big.map(x=>`${x.n}${stZh(x.st)}${x.fresh?'(剛缺陣,隊友還沒適應':'('}${x.fresh?',':''}約少 ${Math.abs(x.imp).toFixed(1)} 分)`).join('、')},合計讓該隊弱約 ${Math.abs(sd.imp).toFixed(1)} 分。`,2+1.5*Math.abs(sd.imp));
+      if(big.length&&sd.imp<=-0.7)add('傷兵',`${nm} ${big.map(x=>`${x.n}${stZh(x.st)}${x.fresh&&/out|doubt|suspen/i.test(x.st)?'(剛缺陣不久、隊友還沒適應,':'('}約少 ${Math.abs(x.imp).toFixed(1)} 分)`).join('、')},合計讓該隊弱約 ${Math.abs(sd.imp).toFixed(1)} 分。`,2+1.5*Math.abs(sd.imp));
       else if(big.length)add('傷兵',`${nm} ${big.map(x=>`${x.n}${stZh(x.st)}`).join('、')},但替補頂得上,模型估計影響不到 1 分。`,1.4);
     }
     const net=L.h.imp-L.a.imp;
