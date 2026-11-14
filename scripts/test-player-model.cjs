@@ -9,3 +9,9 @@ const mkG=(id,d,pm)=>({id,d,sy:2027,st:2,po:0,am:pm,mp:0,m:0,hid:1,aid:2,pl:{h:[
 const {rows}=PM.replay([mkG('a','2026-10-21',10),mkG('b','2026-10-23',10)]);
 assert.equal(rows[0].x,0,'首場不得使用本場結果');assert.ok(rows[1].x>0,'第二場使用前一場');
 console.log('player-model 測試通過');
+// 缺陣衝擊:主力連打多場後缺陣,該場特徵應為負(對缺陣方不利),且只在剛缺陣時出現
+{const mk=(i,star)=>({id:'g'+i,d:'2026-11-'+String(i+1).padStart(2,'0'),sy:2027,st:2,po:0,am:5,mp:0,m:0,hid:1,aid:2,
+  pl:{h:[...(star?[{id:10,min:36,pm:8,pts:30,reb:8,ast:8}]:[]),{id:11,min:30,pm:2,pts:8},{id:12,min:30,pm:2,pts:8}],a:[{id:20,min:30,pm:-5,pts:10},{id:21,min:30,pm:-5,pts:10}]}});
+ const L=[];for(let i=0;i<8;i++)L.push(mk(i,true));for(let i=8;i<14;i++)L.push(mk(i,false));
+ const {rows}=PM.replay(L);assert.equal(rows[7].xab,0,'有上場時無衝擊');assert.ok(rows[8].xab<0,'剛缺陣:產出衝擊為負');assert.equal(rows[13].xab,0,'缺陣超過門檻後不再計入');}
+console.log('player-model 缺陣衝擊測試通過');
