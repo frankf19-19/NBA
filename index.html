@@ -1430,11 +1430,13 @@ function analysisPoints(g,p,date){
   const L=p.lineup;
   if(L&&L.h&&L.a){
     for(const [nm,sd] of [[aN,L.a],[hN,L.h]]){
-      const big=sd.outs.filter(x=>Math.abs(x.imp)>=0.3).slice(0,3);
-      if(big.length)add('傷兵',`${nm} ${big.map(x=>`${x.n}${stZh(x.st)}(${x.imp<=0?'約少':'反而多'} ${Math.abs(x.imp).toFixed(1)} 分)`).join('、')}${sd.outs.length>big.length?` 等 ${sd.outs.length} 人`:''},合計讓該隊${sd.imp<=0?'弱':'強'} ${Math.abs(sd.imp).toFixed(1)} 分。`,3+Math.abs(sd.imp));
+      /* 只講真的有影響的缺陣(單人 ≥0.5 分);板凳末段缺陣的微小正負值是雜訊,不列 */
+      const big=sd.outs.filter(x=>x.imp<=-0.5).slice(0,3);
+      if(big.length&&sd.imp<=-0.7)add('傷兵',`${nm} ${big.map(x=>`${x.n}${stZh(x.st)}(約少 ${Math.abs(x.imp).toFixed(1)} 分)`).join('、')},合計讓該隊弱約 ${Math.abs(sd.imp).toFixed(1)} 分。`,2+1.5*Math.abs(sd.imp));
+      else if(big.length)add('傷兵',`${nm} ${big.map(x=>`${x.n}${stZh(x.st)}`).join('、')},但替補頂得上,模型估計影響不到 1 分。`,1.4);
     }
     const net=L.h.imp-L.a.imp;
-    if(!L.h.outs.length&&!L.a.outs.length)add('陣容','兩隊主力大致齊全,比的是原本實力。',1);
+    if(!L.h.outs.some(x=>x.imp<=-0.5)&&!L.a.outs.some(x=>x.imp<=-0.5))add('陣容','兩隊主力大致齊全,比的是原本實力。',1);
     else if(Math.abs(net)>=1.5)add('陣容',`傷兵淨影響:對 ${net>0?hN:aN} 有利約 ${Math.abs(net).toFixed(1)} 分。`,2.5+Math.abs(net));
     const tops=[[aN,L.a.top],[hN,L.h.top]].filter(x=>x[1]&&x[1].length).map(x=>`${x[0]} 靠 ${x[1].join('、')}`);
     if(tops.length)add('核心',`今天預計上場者中貢獻最大:${tops.join(';')}。`,0.8);
