@@ -418,6 +418,7 @@
   .ov-r{font-family:var(--cond);font-weight:700;font-size:11.5px;margin-left:5px;padding:1px 6px;border-radius:999px}
   .ov-r.hit{background:rgba(70,196,106,.16);color:var(--hit)} .ov-r.miss{background:rgba(239,95,95,.14);color:var(--miss)} .ov-r.full{background:rgba(255,194,71,.22);color:var(--amber)}
   .game{scroll-margin-top:8px}
+  .ov-h span{white-space:nowrap}
   @media (max-width:640px){
     .ov-h,.ov-row{grid-template-columns:1.3fr 1.15fr .7fr;padding:7px 9px;gap:4px} .ov-row{font-size:12.5px}
     .absent{padding:7px 9px}
@@ -1823,7 +1824,7 @@ async function loadDay(quiet){
         const right=g.status==='Final'?`<b>${g.awayScore}–${g.homeScore}</b>${rv?(rv.mbHit?'<span class="ov-r full">★全中</span>':rv.hit?'<span class="ov-r hit">中</span>':'<span class="ov-r miss">未中</span>'):''}`
           :g.status==='Live'?`<b class="ov-live">${g.awayScore??0}–${g.homeScore??0}</b>`:`<span class="ov-t">${esc((g.startTpe||'').split(' ')[1]||'')}</span>`;
         return `<a class="ov-row" href="#g-${g.id}" data-jump="${g.id}"><span class="ov-m">${tm(g.away)} <i>@</i> ${tm(g.home)}</span><span class="ov-p">${tm(fav)} <b>${pct}%</b>${p.mb!=null?` <em>${MB_NAMES[p.mb%6]}</em>`:''}</span><span class="ov-s">${right}</span></a>`;};
-      html=`<div class="overview"><div class="ov-h"><span>對戰</span><span>預測勝方 · 勝分差</span><span>台灣時間/比分</span></div>${ovRows.map(rowH).join('')}</div>`+html;
+      html=`<div class="overview"><div class="ov-h"><span>對戰(客 @ 主)</span><span>預測 · 勝分差</span><span>開賽/比分</span></div>${ovRows.map(rowH).join('')}</div>`+html;
     }
     /* 重畫前記住:畫面上方第一張比賽卡的位置、展開中的對戰紀錄與預測理由;重畫後還原,畫面不跳 */
     const keep=quiet?captureView():null;
