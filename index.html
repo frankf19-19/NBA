@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="NBA 預測">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --field:#dce5f6; --panel:#ffffff; --panel-2:#eaeff8;
@@ -23,7 +23,7 @@
     --wash:rgba(20,31,52,.06); --wash2:rgba(20,31,52,.12); --ink2:#283653; --btn-ink:#ffffff;
     --amber:#ff374d; --teal:#1d428a; --hit:#46c46a; --miss:#ef5f5f; --grow:#7ec96f;
     --mono:'IBM Plex Mono',ui-monospace,monospace;
-    --cond:'Barlow Condensed',sans-serif; --body:'Noto Sans TC',sans-serif;
+    --cond:'Barlow Condensed',sans-serif; --body:-apple-system,BlinkMacSystemFont,'PingFang TC','Heiti TC','Microsoft JhengHei','Noto Sans TC','Noto Sans CJK TC',sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{
@@ -418,6 +418,7 @@
   .ov-r{font-family:var(--cond);font-weight:700;font-size:11.5px;margin-left:5px;padding:1px 6px;border-radius:999px}
   .ov-r.hit{background:rgba(70,196,106,.16);color:var(--hit)} .ov-r.miss{background:rgba(239,95,95,.14);color:var(--miss)} .ov-r.full{background:rgba(255,194,71,.22);color:var(--amber)}
   .game{scroll-margin-top:8px}
+  .mode2{margin-left:auto;font-size:18px;line-height:1;width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:var(--wash);cursor:pointer;flex:0 0 auto}
   .ov-h span{white-space:nowrap}
   @media (max-width:640px){
     .ov-h,.ov-row{grid-template-columns:1.3fr 1.15fr .7fr;padding:7px 9px;gap:4px} .ov-row{font-size:12.5px}
@@ -540,7 +541,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.7.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.7.1 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
 </div>
 
 <script src="scripts/game-context.js?v=1"></script>
@@ -2440,7 +2441,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.7.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
+  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.7.1 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -2868,7 +2869,7 @@ const THEMES=[
   {id:'TOR',abbr:'TOR',name:'多倫多暴龍',c1:'#1c1c20',c2:'#ff2b4e',pal:{field:'#212129',panel:'#2e2e3b',panel2:'#383847',glow:'#55556d',amber:'#ff2b4e',teal:'#b4975a',chalk:'#f5f5f7',muted:'#9d9da9',line:'rgba(245,245,247,.16)',wash:'rgba(255,255,255,.08)',wash2:'rgba(255,255,255,.15)',ink2:'#d9d9de',btnInk:'#212129'},palL:{field:'#e5e5ed',panel:'#ffffff',panel2:'#efeff3',glow:'#b4b4cf',amber:'#ff2b4e',teal:'#1c1c20',chalk:'#212126',muted:'#646472',line:'rgba(33,33,38,.16)',wash:'rgba(33,33,38,.06)',wash2:'rgba(33,33,38,.12)',ink2:'#393941',btnInk:'#ffffff'}},
   {id:'UTA',abbr:'UTA',name:'猶他爵士',c1:'#002b5c',c2:'#f9a01b',pal:{field:'#052345',panel:'#083160',panel2:'#0b3c74',glow:'#135cae',amber:'#f9a01b',teal:'#57c48f',chalk:'#f5f6f7',muted:'#8fa2b7',line:'rgba(245,246,247,.16)',wash:'rgba(255,255,255,.08)',wash2:'rgba(255,255,255,.15)',ink2:'#d6dbe0',btnInk:'#052345'},palL:{field:'#dce8f6',panel:'#ffffff',panel2:'#eaf1f8',glow:'#9abfea',amber:'#945c04',teal:'#002b5c',chalk:'#142334',muted:'#4d6989',line:'rgba(20,35,52,.16)',wash:'rgba(20,35,52,.06)',wash2:'rgba(20,35,52,.12)',ink2:'#283c53',btnInk:'#ffffff'}},
   {id:'WAS',abbr:'WAS',name:'華盛頓巫師',c1:'#12294f',c2:'#ff5063',pal:{field:'#061d44',panel:'#0a2a5f',panel2:'#0e3372',glow:'#1b50a7',amber:'#ff5063',teal:'#cdd6e4',chalk:'#f5f6f7',muted:'#8f9eb7',line:'rgba(245,246,247,.16)',wash:'rgba(255,255,255,.08)',wash2:'rgba(255,255,255,.15)',ink2:'#d6dae0',btnInk:'#061d44'},palL:{field:'#dce6f6',panel:'#ffffff',panel2:'#eaeff8',glow:'#9bb8e8',amber:'#ff3c51',teal:'#12294f',chalk:'#142034',muted:'#4d6489',line:'rgba(20,32,52,.16)',wash:'rgba(20,32,52,.06)',wash2:'rgba(20,32,52,.12)',ink2:'#283853',btnInk:'#ffffff'}}];
-let themeMode=storage.getItem('nba_mode_v2')||'light';
+let themeMode=storage.getItem('nba_mode_v2')||((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');   /* 沒選過就跟手機/電腦的深色設定 */
 let fxTheme=storage.getItem('nba_theme')||'nba';
 if(!THEMES.some(t=>t.id===fxTheme))fxTheme='nba';
 const fxCanvas=document.getElementById('fx');
@@ -2938,12 +2939,16 @@ tb.innerHTML='<span style="font-family:var(--cond);letter-spacing:.1em;font-size
   +`<button class="theme-b" id="modeBtn" title="亮/暗模式切換" style="width:34px">${themeMode==='light'?'☀️':'🌙'}</button>`
   +THEMES.map(t=>`<button class="theme-b tb-abbr" data-t="${t.id}" title="${t.name}" style="background:${t.pal.panel2};color:${t.c2};border-color:${t.c2}"><img src="${teamLogo(t.abbr)}" alt="" loading="lazy" onerror="this.remove()">${t.abbr}</button>`).join('');
 tb.querySelectorAll('.theme-b[data-t]').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.t)));
-document.getElementById('modeBtn').addEventListener('click',()=>{
+function toggleMode(){
   themeMode=themeMode==='light'?'dark':'light';
   storage.setItem('nba_mode_v2',themeMode);
-  document.getElementById('modeBtn').textContent=themeMode==='light'?'☀️':'🌙';
+  document.querySelectorAll('#modeBtn,#modeBtn2').forEach(b=>{b.textContent=themeMode==='light'?'☀️':'🌙';b.setAttribute('aria-label',themeMode==='light'?'切換成深色模式':'切換成淺色模式');});
   applyTheme(fxTheme);
-});
+}
+document.getElementById('modeBtn').addEventListener('click',toggleMode);
+{const h=document.getElementById('homeLink');if(h){const b=document.createElement('button');b.id='modeBtn2';b.className='mode2';b.type='button';
+  b.textContent=themeMode==='light'?'☀️':'🌙';b.setAttribute('aria-label',themeMode==='light'?'切換成深色模式':'切換成淺色模式');b.title='深色/淺色模式';
+  b.addEventListener('click',e=>{e.stopPropagation();toggleMode();});h.appendChild(b);}}
 applyTheme(fxTheme);
 
 /* ---------- 區塊收合 ---------- */
