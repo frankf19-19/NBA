@@ -514,6 +514,37 @@
     table.autolearn td:nth-child(2){font-weight:700;color:var(--chalk)}
   }
   .date-note{font-size:12px;color:var(--muted);margin:0 0 8px}
+  /* ---------- v3.13 視覺整理:記分板統計列 + 安靜的卡片 ---------- */
+  /* 唯一大膽的元素:頁首統計做成球館記分板(深底、亮色數字) */
+  #statRow{background:var(--chalk);color:#fff;border-radius:12px;padding:12px 16px 10px;margin-top:12px;gap:8px 24px!important;align-items:center!important}
+  #statRow .num{color:#ffd166!important;text-shadow:0 0 14px rgba(255,209,102,.35)!important;white-space:nowrap;font-variant-numeric:tabular-nums}
+  #statRow .num.small{color:#fff!important;text-shadow:none!important}
+  #statRow #dayFull{color:#ffd166!important}
+  #statRow .lbl{color:rgba(255,255,255,.62)!important;letter-spacing:.04em!important;text-transform:none!important}
+  #statRow .status{color:rgba(255,255,255,.55)!important;font-family:var(--body)!important}
+  #statRow .season-tag{color:rgba(255,255,255,.75);margin-bottom:0;font-size:12px;letter-spacing:.06em}
+  .date-note{display:none}
+  /* 卡片:少框線、層次靠留白與字重 */
+  .game{border-radius:14px;border-color:transparent;box-shadow:0 1px 0 var(--line),0 6px 22px -14px rgba(20,31,52,.35)}
+  .overview{border-radius:14px;border-color:transparent;box-shadow:0 1px 0 var(--line),0 6px 22px -14px rgba(20,31,52,.35)}
+  .absent{border:none;border-left:3px solid var(--miss);border-radius:8px}
+  .mbb{border:none;background:transparent;padding:2px 2px 0}
+  .mbb.on{box-shadow:none;background:rgba(255,194,71,.16);border-radius:8px}
+  .mbb .mbr{height:5px}
+  .pickbar{border:none;border-left:4px solid var(--teal);background:var(--wash)}
+  .prob{margin-top:10px}
+  details.more{border-top-style:solid}
+  .why,.review{border-top-style:solid}
+  @media (max-width:640px){
+    header{padding:12px 12px 12px!important}
+    #statRow{grid-template-columns:repeat(4,1fr)!important;padding:10px 6px 8px;gap:4px!important;margin-top:8px}
+    #statRow .stat{background:none!important;padding:2px 0!important}
+    #statRow .num,#statRow .num.small{font-size:20px!important}
+    #statRow #dayRec{font-size:15px!important;padding-top:4px}
+    #statRow .season-tag,#statRow .status{grid-column:1/-1!important;text-align:center!important}
+    .datebar .btn span:last-child{display:none} .datebar .btn{padding:0!important}
+  }
+
   :focus-visible{outline:3px solid var(--teal);outline-offset:4px}
   button,input,select{min-height:40px}
   /* 不用 content-visibility:畫面外的比賽卡會先用 440px 佔位、捲到時才變成實際高度(約 880px),造成頁面一直跳 */
@@ -546,9 +577,9 @@
       <button class="btn" id="loadBtn"><span class="ico">⟳</span><span>載入</span></button>
     </div>
     <details class="themewrap"><summary>🎨 更換主題配色</summary><div id="themeBar"></div></details>
-    <div class="score-row" id="statRow"><div class="season-tag">本季至今(開打前存檔的預測)</div>
+    <div class="score-row" id="statRow"><div class="season-tag">本季至今</div>
       <div class="stat"><div class="num" id="dayPct">—</div><div class="lbl"><span class="nm-full">當日模型命中率</span><span class="nm-short">勝負命中</span></div></div>
-      <div class="stat"><div class="num small" id="dayRec">—</div><div class="lbl"><span class="nm-full">命中 / 已完賽</span><span class="nm-short">命中/完賽</span></div></div>
+      <div class="stat"><div class="num small" id="dayRec">—</div><div class="lbl"><span class="nm-full">命中 / 已完賽</span><span class="nm-short">命中場數</span></div></div>
       <div class="stat"><div class="num small" id="dayErr">—</div><div class="lbl"><span class="nm-full">平均分差誤差</span><span class="nm-short">分差誤差</span></div></div>
       <div class="stat"><div class="num small" id="dayFull" style="color:var(--amber)">—</div><div class="lbl"><span class="nm-full">全中(勝方+分差區間)</span><span class="nm-short">全中</span></div></div>
       <div class="status" id="status" role="status" aria-live="polite"></div>
@@ -624,7 +655,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.12.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.13.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
 </div>
 
 <script src="scripts/game-context.js?v=1"></script>
@@ -1970,8 +2001,8 @@ async function loadDay(quiet){
         if(!document.hidden&&!$('homeView').classList.contains('hidden'))loadDay(true);
       },45000);
     }
-    st.textContent='更新 '+new Date().toLocaleTimeString('zh-TW',{hour12:false})+' · '+(finals?`完成 · ${finals} 場已完賽已比對`:'完成 · 該日尚無完賽結果')
-      +(refreshTimer?' · 🔴 每 45 秒自動更新':'');
+    st.textContent=new Date().toLocaleTimeString('zh-TW',{hour12:false,hour:'2-digit',minute:'2-digit'})+' 更新'+(finals?`,${finals} 場已完賽`:'')
+      +(refreshTimer?',比賽進行中每 45 秒自動更新':'');
     bindTeamClicks();
     loadTransactions(date);
     loadH2H(games,season);
@@ -2570,7 +2601,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.12.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
+  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.13.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -3153,7 +3184,7 @@ if(!window.__CLOUD_BUILD&&'serviceWorker' in navigator&&location.protocol==='htt
 if(!window.__CLOUD_BUILD){
   prewarmDay(dp.value);
   loadCloud().then(()=>loadDay()).then(()=>{
-    if(cloudFresh()){$('status').textContent+=` · ☁️ 雲端校準 K=${MARGIN_K.toFixed(2)} σ=${RUN_SIGMA.toFixed(2)}`;return;}
+    if(cloudFresh())return;
     return autoCalibrate();
   }).then(()=>{renderFooter();return maybeBuildPDB();});
 }
