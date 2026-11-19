@@ -5,7 +5,11 @@
    最終分差 = a + c×正負值差 + cx×產出差 + cb×原模型原始分差(mp),係數以過去 5 個完整球季的逐場時序資料擬合。
    嚴格時序:每場只用之前的比賽;是否啟用由逐季時間外驗證決定(門檻事先寫死,見 GATE)。 */
 const VERSION='player-v1.1';
-const CFG={decay:0.985,k:150,minDecay:0.8,carry:0.8,firstSeason:2010,trainSeasons:5,validateSeasons:6,absMiss:3,absMin:18,absGames:5};
+const BASE_CFG=Object.freeze({decay:0.985,k:150,minDecay:0.8,carry:0.8,firstSeason:2010,trainSeasons:5,validateSeasons:6,absMiss:3,absMin:18,absGames:5});
+let CFG={...BASE_CFG};
+/* 自動調參(scripts/player-tune.cjs)找到更好的設定時,以 player-tune.json 覆寫;這裡只允許改可調的欄位 */
+const TUNABLE=['decay','k','minDecay','carry','absMiss','absMin'];
+function withCfg(over,fn){const old=CFG;CFG={...BASE_CFG};for(const k of TUNABLE)if(over&&Number.isFinite(over[k]))CFG[k]=over[k];try{return fn();}finally{CFG=old;}}
 /* 缺陣衝擊(player-v1.1):主力剛缺陣的前幾場(已缺 ≤absMiss 場、平常上場 ≥absMin 分鐘),隊友的正負值還帶著「跟他一起打」的成績,
    球隊評分也還沒反應,模型會低估損失(2016–27 共 1.4 萬隊次驗證:28+ ppg 球星缺陣,模型扣 3.6 分、實際再差 1.8 分)。
    加兩個特徵:實際陣容實力 −「他若有打」的陣容實力(正負值、產出各一),係數由資料學;逐季驗證通過(ABS_GATE)才啟用。 */
@@ -63,7 +67,8 @@ function ols(rows,f){
 }
 const feat=r=>[1,r.x,r.xb,r.base],feat0=r=>[1,r.x0,r.xb0,r.base],featA=r=>[1,r.x,r.xb,r.base,r.xa,r.xab];
 const pred=(w,r,f=feat)=>f(r).reduce((s,v,i)=>s+v*w[i],0);
-function build(LED,{season}){
+function build(LED,opts){return withCfg(opts&&opts.cfg,()=>buildInner(LED,opts));}
+function buildInner(LED,{season}){
   const {P,N,rows}=replay(LED);
   const validation=[];
   for(let s=season-CFG.validateSeasons;s<season;s++){
@@ -92,7 +97,7 @@ function build(LED,{season}){
     players[id]={t:p.tid,r:+rate(p).toFixed(5),b:+boxr(p).toFixed(4),em:+p.em.toFixed(1),l:p.last};
     if(p.emp>=CFG.absMin&&p.gp>=CFG.absGames&&p.lastN>0){const ms=(N[p.tid]||0)-p.lastN;if(ms>=0&&ms<=CFG.absMiss){players[id].ep=+p.emp.toFixed(1);players[id].ms=ms;}}}
   const last=rows.length?rows[rows.length-1].d:null;
-  return {schema:1,version:VERSION,season,enabled:!!(passed&&coef),config:CFG,gate:{...GATE,passed,improve:+improve.toFixed(3),improvedSeasons:improved,seasons:validation.length,winnerDiff:+winDiff.toFixed(4)},
+  return {schema:1,version:VERSION,season,enabled:!!(passed&&coef),config:{...CFG},gate:{...GATE,passed,improve:+improve.toFixed(3),improvedSeasons:improved,seasons:validation.length,winnerDiff:+winDiff.toFixed(4)},
     absence:{...ABS_GATE,passed:absPassed,improve:+absImprove.toFixed(3),improvedSeasons:absSeasons,validation:absVal},
     validation,coef:coef&&coef.map(v=>+v.toFixed(4)),trainedThrough:last,players};
 }
@@ -103,4 +108,4 @@ function teamStrength(model,roster,avail){
   for(const id of roster){const p=model.players[id];if(!p)continue;const pr=avail&&avail[id]!=null?avail[id]:1;const em=p.em*pr;if(em>0){ws.push([p,em]);tot+=em;}}
   if(!tot)return null;const sc=240/tot;let s=0,b=0;for(const [p,em] of ws){s+=em*sc*p.r;b+=em*sc*p.b;}return [s/5,b/5];
 }
-module.exports={VERSION,CFG,GATE,replay,build,teamStrength,ols};
+module.exports={VERSION,get CFG(){return CFG;},BASE_CFG,TUNABLE,GATE,withCfg,replay,build,teamStrength,ols,featA};

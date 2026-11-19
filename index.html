@@ -357,6 +357,7 @@
   .pk-mb{margin-left:auto;font-family:var(--mono);font-weight:600;font-size:13.5px;color:var(--amber);border:1px solid var(--amber);border-radius:999px;padding:1px 10px;white-space:nowrap}
   .pk-sub{font-size:12.5px;color:var(--muted);margin-top:3px} .pk-sub b{color:var(--ink2);font-family:var(--mono)}
   .why.slim{border-top:none;margin-top:8px;padding-top:0}
+  table.autolearn td{white-space:normal;text-align:left!important;font-family:var(--body);vertical-align:top;line-height:1.5} table.autolearn td:first-child{white-space:nowrap;font-family:var(--mono)} table.autolearn th{text-align:left!important}
   .rv-why{margin-top:6px} .rv-why ul{margin:4px 0 0 18px;padding:0} .rv-why li{margin:2px 0}
   .absent{margin-top:10px;border:1px solid rgba(239,95,95,.45);border-radius:9px;background:rgba(239,95,95,.06);padding:8px 10px}
   .absent.ok{border-color:var(--line);background:none;color:var(--muted);font-size:12.5px;padding:6px 10px}
@@ -613,7 +614,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.10.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.11.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
 </div>
 
 <script src="scripts/game-context.js?v=1"></script>
@@ -2508,7 +2509,8 @@ async function loadCloud(){
     jget('margin-model.json?t='+Math.floor(Date.now()/600000)).then(x=>MARGIN_MODEL=x).catch(()=>MARGIN_MODEL=null),
     jget('quality-model.json?t='+Math.floor(Date.now()/600000)).then(x=>QUALITY_MODEL=x).catch(()=>QUALITY_MODEL=null),
     jget('model-guard.json?t='+Math.floor(Date.now()/600000)).then(x=>MODEL_GUARD=x).catch(()=>MODEL_GUARD=null),
-    jget('player-model.json?t='+Math.floor(Date.now()/600000)).then(x=>PLAYER_MODEL=x).catch(()=>PLAYER_MODEL=null)
+    jget('player-model.json?t='+Math.floor(Date.now()/600000)).then(x=>PLAYER_MODEL=x).catch(()=>PLAYER_MODEL=null),
+    jget('player-tune.json?t='+Math.floor(Date.now()/600000)).then(x=>PLAYER_TUNE=x).catch(()=>PLAYER_TUNE=null)
   ]);
   renderFooter();
 }
@@ -2550,7 +2552,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.10.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
+  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.11.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
@@ -2563,11 +2565,25 @@ function mergeLedger(entries){
   storage.setItem('nba_ledger',JSON.stringify(L));
   return L.length;
 }
+/* 自動進步紀錄:模型自己學到、改了什麼,以及每週自動調參試了什麼(沒採用的也列出) */
+let PLAYER_TUNE=null;
+function autoLearnHtml(){
+  const rows=[];const fmt=v=>(v>0?'−':'+')+Math.abs(v).toFixed(3);
+  const nm={decay:'球員舊比賽淡出速度',k:'正負值樣本收縮',minDecay:'預期上場時間反應速度',carry:'上季數據帶入比例',absMiss:'「剛缺陣」計算場數',absMin:'「主力」上場時間門檻'};
+  if(PLAYER_TUNE&&Array.isArray(PLAYER_TUNE.history))for(const h of PLAYER_TUNE.history.slice(-8).reverse()){const b=h.best;
+    rows.push(`<tr><td>${esc(h.date)}</td><td>球員層每週自動調參</td><td>${b?`試 ${esc(nm[b.param]||b.param)} ${b.from} → ${b.to}:誤差 ${fmt(b.gain)} 分、${b.better}/6 季進步`:'—'}</td><td>${h.adopted?'<b style="color:var(--hit)">已採用</b>':'未過門檻,維持'}</td></tr>`);}
+  if(PLAYER_MODEL&&PLAYER_MODEL.trainedThrough)rows.push(`<tr><td>${esc(PLAYER_MODEL.trainedThrough)}</td><td>球員分數與權重</td><td>每天用最新比賽重算每位球員的正負值、產出與上場時間,重新擬合權重;近 6 季驗證每場少錯 ${PLAYER_MODEL.gate.improve.toFixed(2)} 分</td><td>${PLAYER_MODEL.enabled?'<b style="color:var(--hit)">使用中</b>':'未過門檻'}</td></tr>`);
+  if(CLOUD&&CLOUD.updated)rows.push(`<tr><td>${esc(String(CLOUD.updated).slice(0,10))}</td><td>分差刻度 K、信心 σ、缺陣係數</td><td>每天以近 2,500 場重新擬合:K=${MARGIN_K.toFixed(2)}、σ=${RUN_SIGMA.toFixed(2)}、每缺 1 分場均扣 ${INJ_F} 分</td><td>使用中</td></tr>`);
+  if(MODEL_GUARD)rows.push(`<tr><td>每天</td><td>實戰把關</td><td>新版球隊模型 vs 舊版:${MODEL_GUARD.dates} 日 ${MODEL_GUARD.games} 場;球員層 vs 原模型:${MODEL_GUARD.player?MODEL_GUARD.player.dates+' 日 '+MODEL_GUARD.player.games+' 場':'—'}(滿 30 日 300 場後,落後就自動換回)</td><td>${esc(MODEL_GUARD.reason)}</td></tr>`);
+  if(!rows.length)return '';
+  return `<div class="pos-group" style="margin-top:14px">自動進步紀錄</div><div style="font-size:13px;color:var(--muted);margin-bottom:6px">模型每天自己重學、每週自己找更好的設定;只有在過去 6 個球季的時間外驗證中確實更準才會採用。</div>
+    <div class="table-wrap"><table class="stat autolearn" style="min-width:560px"><tr><th>日期</th><th>項目</th><th>內容</th><th>結果</th></tr>${rows.join('')}</table></div>`;
+}
 function renderCalibHist(){
   const h=calibHist().slice(-10).reverse();
   const L=ledger();
   const el=$('calibHist');
-  let html='';
+  let html=autoLearnHtml();
   if(L.length){
     const hits=L.filter(x=>x.hit).length;
     const mae=L.reduce((s,x)=>s+Math.abs(x.am-x.m*MARGIN_K),0)/L.length;

@@ -495,7 +495,14 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   try{const artifact=Quality.build(LED,{cutoff:today,season:seasonNow});if(artifact){fs.writeFileSync(F_QUALITY,JSON.stringify(artifact));E(`QUALITY_MODEL=${JSON.stringify(artifact)}`);console.log('點分差逐季驗證',JSON.stringify({enabled:artifact.enabled,choice:artifact.selection.name,recent:artifact.statistics.recent}));}}catch(e){console.error('點分差模型保留上一版:',e.message);}
 
   /* 球員層實力模型(player-v1):逐季時間外驗證通過才啟用;失敗保留上一版 */
-  try{const PM=require('./player-model.cjs'),F_PLAYER=path.join(ROOT,'player-model.json');const pmA=PM.build(LED,{season:seasonNow});
+  /* 球員層自動調參:每週一次往更好的設定走一步(門檻見 scripts/player-tune.cjs);快速更新時不跑 */
+  let tuneCfg=null;
+  try{const F_TUNE=path.join(ROOT,'player-tune.json'),prevTune=readJSON(F_TUNE,null);tuneCfg=prevTune&&prevTune.cfg||null;
+    if(!FAST_REFRESH&&(!prevTune||!prevTune.lastRun||prevTune.lastRun<=shiftDate(today,-7))){
+      const T=require('./player-tune.cjs'),t0=Date.now(),res=T.tune(LED,seasonNow,prevTune,today);fs.writeFileSync(F_TUNE,JSON.stringify(res));tuneCfg=res.cfg;
+      const h=res.history[res.history.length-1];console.log('球員層自動調參',JSON.stringify(h),`${((Date.now()-t0)/1000).toFixed(0)} 秒`);}
+  }catch(e){console.error('自動調參略過:',e.message);}
+  try{const PM=require('./player-model.cjs'),F_PLAYER=path.join(ROOT,'player-model.json');const pmA=PM.build(LED,{season:seasonNow,cfg:tuneCfg});
     if(pmA&&pmA.coef){fs.writeFileSync(F_PLAYER,JSON.stringify(pmA));E(`PLAYER_MODEL=${JSON.stringify(pmA)}`);
       console.log('球員層實力',JSON.stringify({enabled:pmA.enabled,gate:pmA.gate,players:Object.keys(pmA.players).length}));}
   }catch(e){console.error('球員層實力保留上一版:',e.message);const old=readJSON(path.join(ROOT,'player-model.json'),null);if(old)E(`PLAYER_MODEL=${JSON.stringify(old)}`);}
