@@ -453,6 +453,18 @@
     .ab-chip{margin:2px 3px 2px 0;font-size:12px;padding:1px 7px} .ab-chip.key{font-size:12.5px}
     .ab-more{margin-left:2px}
   }
+
+  .season-tag{display:none;width:100%;font-family:var(--cond);font-weight:700;letter-spacing:.08em;font-size:12px;color:var(--teal);margin-bottom:-8px}
+  #statRow.season .season-tag{display:block}
+  @media (max-width:640px){#statRow.season .season-tag{grid-column:1/-1;margin-bottom:0}}
+  @media (min-width:1100px){
+    .wrap{max-width:1220px}
+    #games{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+    #games>.overview,#games>.empty{grid-column:1/-1}
+    #games>.game{margin-bottom:0}
+    .ov-h,.ov-row{grid-template-columns:1.1fr .9fr 100px .55fr!important}
+    .ov-outs{grid-column:1/-1}
+  }
   .date-note{font-size:12px;color:var(--muted);margin:0 0 8px}
   :focus-visible{outline:3px solid var(--teal);outline-offset:4px}
   button,input,select{min-height:40px}
@@ -486,7 +498,7 @@
       <button class="btn" id="loadBtn"><span class="ico">⟳</span><span>載入</span></button>
     </div>
     <details class="themewrap"><summary>🎨 更換主題配色</summary><div id="themeBar"></div></details>
-    <div class="score-row" id="statRow">
+    <div class="score-row" id="statRow"><div class="season-tag">本季至今(開打前存檔的預測)</div>
       <div class="stat"><div class="num" id="dayPct">—</div><div class="lbl"><span class="nm-full">當日模型命中率</span><span class="nm-short">勝負命中</span></div></div>
       <div class="stat"><div class="num small" id="dayRec">—</div><div class="lbl"><span class="nm-full">命中 / 已完賽</span><span class="nm-short">命中/完賽</span></div></div>
       <div class="stat"><div class="num small" id="dayErr">—</div><div class="lbl"><span class="nm-full">平均分差誤差</span><span class="nm-short">分差誤差</span></div></div>
@@ -564,7 +576,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.7.4 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.8.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
 </div>
 
 <script src="scripts/game-context.js?v=1"></script>
@@ -1876,10 +1888,20 @@ async function loadDay(quiet){
     $('games').innerHTML=html||`<div class="empty">${date} 沒有排定的比賽(可能為休賽季、全明星週或休兵日)。<br>NBA 例行賽約為每年 10 月下旬至隔年 4 月、季後賽至 6 月,可切換日期回顧過往賽事與預測回測。</div>`;
     $('listTitle').textContent=date+' 比賽';
     $('listTag').textContent=games.length?games.length+' 場'+(finals?` · 賽前存證 ${frozenFinals} / 歷史重建 ${finals-frozenFinals}`:''):'';
-    $('dayPct').textContent=finals?((hits/finals*100).toFixed(1)+'%'):'—';
-    $('dayRec').textContent=finals?(hits+' / '+finals):'0 / 0';
-    $('dayErr').textContent=errN?(r1(errSum/errN)+' 分'):'—';
-    $('dayFull').textContent=mbN?`${fulls} / ${mbN}`:'—';
+    if(finals){
+      $('dayPct').textContent=(hits/finals*100).toFixed(1)+'%';
+      $('dayRec').textContent=hits+' / '+finals;
+      $('dayErr').textContent=errN?(r1(errSum/errN)+' 分'):'—';
+      $('dayFull').textContent=mbN?`${fulls} / ${mbN}`:'—';
+      $('statRow').classList.remove('season');
+    }else{
+      /* 當天還沒有完賽:改看本季至今(只算開打前凍結、正規賽的預測) */
+      const sy=seasonOf(date),S=ledger().filter(e=>(e.sy||seasonOf(e.d))===sy&&e.d<date&&!e.po&&e.am!=null&&e.pg&&e.pg.mm!=null);
+      if(S.length){const h=S.filter(e=>(e.pg.mm>0)===(e.am>0)).length,fu=S.filter(e=>e.mbh).length,er=S.reduce((a,e)=>a+Math.abs(e.am-e.pg.mm),0)/S.length;
+        $('dayPct').textContent=(h/S.length*100).toFixed(1)+'%';$('dayRec').textContent=h+' / '+S.length;$('dayErr').textContent=r1(er)+' 分';$('dayFull').textContent=(fu/S.length*100).toFixed(1)+'%';
+        $('statRow').classList.add('season');}
+      else{$('dayPct').textContent='—';$('dayRec').textContent='0 / 0';$('dayErr').textContent='—';$('dayFull').textContent='—';$('statRow').classList.remove('season');}
+    }
     const hl=buildHeadlines(date,games,curPreds,reviews);
     $('headlineSec').classList.toggle('hidden',!hl.length);
     $('headlines').innerHTML=hl.map(h=>`<div class="headline"><span class="hk">${esc(h.k)}</span>${esc(h.t)}</div>`).join('');
@@ -2484,7 +2506,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.7.4 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
+  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.8.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
