@@ -51,6 +51,7 @@ jobs:
           node scripts/test-role-study.cjs
           node scripts/test-model-guard.cjs
           node scripts/test-player-model.cjs
+          node scripts/test-postgame.cjs
       - name: 執行校準
         env:
           NBA_FAST_REFRESH: ${{ (github.event_name == 'push' || github.event.schedule == '10 22 * * *' || github.event.schedule == '10 0 * * *') && '1' || '0' }}

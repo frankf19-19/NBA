@@ -357,6 +357,7 @@
   .pk-mb{margin-left:auto;font-family:var(--mono);font-weight:600;font-size:13.5px;color:var(--amber);border:1px solid var(--amber);border-radius:999px;padding:1px 10px;white-space:nowrap}
   .pk-sub{font-size:12.5px;color:var(--muted);margin-top:3px} .pk-sub b{color:var(--ink2);font-family:var(--mono)}
   .why.slim{border-top:none;margin-top:8px;padding-top:0}
+  .rv-why{margin-top:6px} .rv-why ul{margin:4px 0 0 18px;padding:0} .rv-why li{margin:2px 0}
   .absent{margin-top:10px;border:1px solid rgba(239,95,95,.45);border-radius:9px;background:rgba(239,95,95,.06);padding:8px 10px}
   .absent.ok{border-color:var(--line);background:none;color:var(--muted);font-size:12.5px;padding:6px 10px}
   .ab-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-bottom:6px}
@@ -612,7 +613,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.9.1 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.10.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
 </div>
 
 <script src="scripts/game-context.js?v=1"></script>
@@ -1508,8 +1509,13 @@ function review(g,p){
     else if(hit)mbText=`勝方對、區間錯:預測 ${mbLabel(p.mb,g)},實際 ${actLbl};當時給這個實際區間的機率是 ${Math.round((p.mbProbs?.[ai]||0)*100)}%。`;
     else mbText=`全錯:預測 ${mbLabel(p.mb,g)},實際 ${actLbl}。`;
   }
-  if(p.factors&&p.factors.length)t+=`(本場預測已納入:${p.factors.join('、')})`;
-  return {hit,actual,actMargin,text:t,favProb,mbHit,mbText};
+  /* 雲端用自有 box score 算出的賽後原因(三分手感、臨時缺陣、個人爆發、失誤、垃圾時間) */
+  let why=[];const L=g.id&&ledger().find(e=>String(e.id)===String(g.id));
+  if(L&&L.rx&&Array.isArray(L.rx.r)&&L.rx.r.length)why=L.rx.r.slice(0,4).map(x=>x.s);
+  else if(!hit||(p.raw_margin!=null&&Math.abs(actMargin-p.raw_margin)>8))t=t.replace(/分差原因需另外查看比賽內容，單靠目前資料無法判定。|,值得查傷兵名單或主力輪休等模型沒看到的因素/,'(賽後原因分析約在比賽結束後幾小時由雲端補上)');
+  if(why.length)t=t.replace('分差原因需另外查看比賽內容，單靠目前資料無法判定。','主要原因見下方。');
+
+  return {hit,actual,actMargin,text:t,favProb,mbHit,mbText,why};
 }
 
 /* ---------- 首頁渲染 ---------- */
@@ -1731,7 +1737,7 @@ function gameCard(g,p,rv){
     ${la?`<div class="why slim"><span class="k" style="color:var(--amber)">即時戰況</span>${esc(la.text)}</div>`:''}
     ${(isLive&&g.lastPlay)?`<div class="why slim"><span class="k" style="color:var(--teal)">即時重點</span>${esc(g.lastPlay)}</div>`:''}
     ${bestLine?`<div class="why slim"><span class="k" style="color:var(--teal)">比賽重點</span>${esc(bestLine)}</div>`:''}
-    ${rv?`<div class="review ${rv.hit?'good':'bad'}"><span class="k">${rv.hit?'賽後檢討 ✓':'賽後檢討 ✗'}</span>${esc(rv.text)}${rv.mbText?`<br><span class="k" style="color:var(--amber)">分差區間</span>${esc(rv.mbText)}`:''}</div>`:''}
+    ${rv?`<div class="review ${rv.hit?'good':'bad'}"><span class="k">${rv.hit?'賽後檢討 ✓':'賽後檢討 ✗'}</span>${esc(rv.text)}${rv.mbText?`<br><span class="k" style="color:var(--amber)">分差區間</span>${esc(rv.mbText)}`:''}${rv.why&&rv.why.length?`<div class="rv-why"><span class="k" style="color:var(--teal)">為什麼</span><ul>${rv.why.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}</div>`:''}
     <details class="more" data-more="${g.id}"><summary>詳細分析<span class="more-hint">預測理由 · 對戰 · 風格 · 機率細節</span></summary>
       ${restHtml}
       ${method?`<div class="meta">本場採用：${method}${p.frozen?' · 賽前已封存':''}</div>`:''}
@@ -2544,7 +2550,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.9.1 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
+  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.10.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();

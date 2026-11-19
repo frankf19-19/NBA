@@ -76,7 +76,7 @@ const readJSON=(f,d)=>{try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch(e
 function etToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function shiftDate(d,n){const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
 const verifiedPregame=e=>!!(e.pg&&e.pg.at&&(e.pg.tip||e.tip)&&Date.parse(e.pg.at)<Date.parse(e.pg.tip||e.tip));
-const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;if(e.mbp!=null)o.mbp=e.mbp;}if(e.pg)o.pg=e.pg;if(e.tip)o.tip=e.tip;if(e.mm!=null)o.mm=e.mm;if(e.mk!=null)o.mk=e.mk;if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.cf)o.cf=1;if(e.nm)o.nm=1;return o;};
+const slim=e=>{const o={id:e.id,d:e.d,sy:e.sy,aw:e.aw,hm:e.hm,hid:e.hid,aid:e.aid,m:e.m,am:e.am,hit:e.hit};if(e.mb!=null){o.mb=e.mb;o.mbh=e.mbh;if(e.mbp!=null)o.mbp=e.mbp;}if(e.pg)o.pg=e.pg;if(e.tip)o.tip=e.tip;if(e.mm!=null)o.mm=e.mm;if(e.mk!=null)o.mk=e.mk;if(e.mp!=null)o.mp=e.mp;if(e.ts)o.ts=e.ts;if(e.st!=null)o.st=e.st;if(e.rx)o.rx=e.rx;if(e.po)o.po=1;if(e.nu)o.nu=1;if(e.cf)o.cf=1;if(e.nm)o.nm=1;return o;};
 /* 依日期插入(保持紀錄簿時間順序,逐隊偏差才不會看錯場次) */
 function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+hi)>>1;if(arr[mid].d<=e.d)lo=mid+1;else hi=mid;}arr.splice(lo,0,e);}
 
@@ -808,6 +808,14 @@ function insertSorted(arr,e){let lo=0,hi=arr.length;while(lo<hi){const mid=(lo+h
   const health={withPb:LED.filter(e=>e.pb).length,withOf:LED.filter(e=>e.of).length,withOd:LED.filter(e=>e.od).length,withBx:LED.filter(e=>e.bx).length,withPg:LED.filter(e=>e.pg).length,verifiedPg:LED.filter(verifiedPregame).length,withTs:LED.filter(e=>e.ts).length,withF:LED.filter(e=>e.f).length,games:LED.length,reg:LED.filter(e=>!e.po).length,po:LED.filter(e=>e.po).length,withPl:LED.filter(e=>e.pl).length,
     fixed,added,errors,fitN:samples.length,pdb:pdbN,seasonsN:seasons.length,seasons,secs:Math.round((Date.now()-t0)/1000)};
   const fit={variant,prm:PRMF,K:KF,coef:coefF,trainN:finalTrain.length,win:WIN,bt,tot,hcaBySeason,phEval};
+  /* 賽後自動檢討(只做事後說明,不改任何預測):本季已完賽、有完整 box score 的場次 */
+  try{const PG=require('./postgame.cjs'),names=(readJSON(path.join(ROOT,'pdb.json'),{players:{}}).players)||{};
+    const cur=LED.filter(e=>e.sy===seasonNow&&e.st===2&&Number.isFinite(e.am)&&e.bx).sort((x,y)=>x.d.localeCompare(y.d));
+    const lg=PG.leagueRates(cur.length>=100?cur:LED.filter(e=>e.sy===seasonNow-1&&e.bx).slice(-600));let nRx=0;
+    for(let i=0;i<cur.length;i++){const e=cur[i];if(e.rx&&e.rx.v===PG.VERSION&&e.d<shiftDate(today,-3))continue;
+      const prior=cur.filter(x=>x.d<e.d);const r=PG.explain(e,prior,PRE[e.id],names,lg);if(r){e.rx=r;nRx++;}}
+    console.log('賽後檢討',nRx,'場');
+  }catch(e){console.error('賽後檢討略過:',e.message);}
   const calib={k:K,sigma:S,injF:inj.f,inj,injPG,prm:PRMF,mb:MBT,styles:STY,cmp:CMP,fit,hist,ledger:LED.slice(-CLIENT_LEDGER).map(slim),
     last:LED.length?LED[LED.length-1].d:null,updated:new Date().toISOString(),window:FIT_DAYS,health};
   fs.writeFileSync(F_CALIB,JSON.stringify(calib));
