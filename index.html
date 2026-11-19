@@ -540,7 +540,7 @@
     #statRow{grid-template-columns:repeat(4,1fr)!important;padding:10px 6px 8px;gap:4px!important;margin-top:8px}
     #statRow .stat{background:none!important;padding:2px 0!important}
     #statRow .num,#statRow .num.small{font-size:20px!important}
-    #statRow #dayRec{font-size:15px!important;padding-top:4px}
+    #statRow #dayRec{font-size:16px!important;padding-top:3px;letter-spacing:-.02em}
     #statRow .season-tag,#statRow .status{grid-column:1/-1!important;text-align:center!important}
     .datebar .btn span:last-child{display:none} .datebar .btn{padding:0!important}
   }
@@ -580,7 +580,7 @@
     <div class="score-row" id="statRow"><div class="season-tag">本季至今</div>
       <div class="stat"><div class="num" id="dayPct">—</div><div class="lbl"><span class="nm-full">當日模型命中率</span><span class="nm-short">勝負命中</span></div></div>
       <div class="stat"><div class="num small" id="dayRec">—</div><div class="lbl"><span class="nm-full">命中 / 已完賽</span><span class="nm-short">命中場數</span></div></div>
-      <div class="stat"><div class="num small" id="dayErr">—</div><div class="lbl"><span class="nm-full">平均分差誤差</span><span class="nm-short">分差誤差</span></div></div>
+      <div class="stat"><div class="num small" id="dayErr">—</div><div class="lbl"><span class="nm-full">平均分差誤差(分)</span><span class="nm-short">誤差(分)</span></div></div>
       <div class="stat"><div class="num small" id="dayFull" style="color:var(--amber)">—</div><div class="lbl"><span class="nm-full">全中(勝方+分差區間)</span><span class="nm-short">全中</span></div></div>
       <div class="status" id="status" role="status" aria-live="polite"></div>
     </div>
@@ -1978,15 +1978,15 @@ async function loadDay(quiet){
     $('listTag').textContent=games.length?games.length+' 場'+(finals?` · 賽前存證 ${frozenFinals} / 歷史重建 ${finals-frozenFinals}`:''):'';
     if(finals){
       $('dayPct').textContent=(hits/finals*100).toFixed(1)+'%';
-      $('dayRec').textContent=hits+' / '+finals;
-      $('dayErr').textContent=errN?(r1(errSum/errN)+' 分'):'—';
+      $('dayRec').textContent=hits+'/'+finals;
+      $('dayErr').textContent=errN?r1(errSum/errN):'—';
       $('dayFull').textContent=mbN?`${fulls} / ${mbN}`:'—';
       $('statRow').classList.remove('season');
     }else{
       /* 當天還沒有完賽:改看本季至今(只算開打前凍結、正規賽的預測) */
       const sy=seasonOf(date),S=ledger().filter(e=>(e.sy||seasonOf(e.d))===sy&&e.d<date&&!e.po&&e.am!=null&&e.pg&&e.pg.mm!=null);
       if(S.length){const h=S.filter(e=>(e.pg.mm>0)===(e.am>0)).length,fu=S.filter(e=>e.mbh).length,er=S.reduce((a,e)=>a+Math.abs(e.am-e.pg.mm),0)/S.length;
-        $('dayPct').textContent=(h/S.length*100).toFixed(1)+'%';$('dayRec').textContent=h+' / '+S.length;$('dayErr').textContent=r1(er)+' 分';$('dayFull').textContent=(fu/S.length*100).toFixed(1)+'%';
+        $('dayPct').textContent=(h/S.length*100).toFixed(1)+'%';$('dayRec').textContent=h+'/'+S.length;$('dayErr').textContent=r1(er);$('dayFull').textContent=(fu/S.length*100).toFixed(1)+'%';
         $('statRow').classList.add('season');}
       else{$('dayPct').textContent='—';$('dayRec').textContent='0 / 0';$('dayErr').textContent='—';$('dayFull').textContent='—';$('statRow').classList.remove('season');}
     }
