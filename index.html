@@ -522,7 +522,7 @@
     .overview .ov-h,.overview .ov-row{grid-template-columns:minmax(0,1.05fr) minmax(0,1.25fr) auto!important}
     .ov-h-lead{display:block;text-align:left}
     .ov-lead{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 14px;align-items:center;border-left:1px solid var(--line);padding-left:14px;position:relative}
-    .ov-lead-t{position:absolute;top:-2px;right:0;font-size:10.5px;color:var(--muted)}
+    .ov-lead-t{grid-column:1/-1;font-size:10.5px;color:var(--muted);line-height:1.2}
     .ov-ld{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:13px;white-space:nowrap}
     .ov-ld i{font-style:normal;font-size:11px;color:var(--muted);flex:0 0 auto}
     .ov-ld b{font-weight:600;color:var(--chalk);overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -1726,7 +1726,7 @@ function leadersHtml(g){
   if(!L)return live?'<div class="ov-lead"><span class="ov-lead-t">數據王讀取中…</span></div>':'';
   const last=n=>{const a=String(n||'').split(' ');return a.length>1?a.slice(1).join(' '):n;};
   const cell=([k,zh])=>{const x=L[k];if(!x)return '';return `<span class="ov-ld${k==='TO'?' to':''}"><i>${zh}</i><b>${esc(last(x.n))}</b><em>${live?x.v:(+x.v).toFixed(1)}</em></span>`;};
-  return `<div class="ov-lead"><span class="ov-lead-t">${g.status==='Live'?'<span class="ov-live">● 本場</span>':g.status==='Final'?'本場':'本季場均'}</span>${LEAD_CATS.map(cell).join('')}</div>`;
+  return `<div class="ov-lead${live?' is-live':''}">${g.status==='Live'?'<span class="ov-lead-t"><span class="ov-live">● 本場即時</span></span>':g.status==='Final'?'<span class="ov-lead-t">本場</span>':''}${LEAD_CATS.map(cell).join('')}</div>`;
 }
 function absentHtml(g,date){
   if(!INJ_READY||!date||date<etToday())return '';
@@ -2025,7 +2025,7 @@ async function loadDay(quiet){
         return `<a class="ov-row" href="#g-${g.id}" data-jump="${g.id}">
           <div class="ov-teams">${line(g.away,g.awayId,g.awayAbbr,g.awayScore,!favHome,'客')}${line(g.home,g.homeId,g.homeAbbr,g.homeScore,favHome,'主')}</div>${leadersHtml(g)}
           <div class="ov-pred"><div class="ov-call"><b>${tm(fav)}</b> 贏${p.mb!=null?` <em class="ov-bk">${MB_NAMES[p.mb%6]}</em> 分`:''}</div><div class="ov-meta">勝率 ${pct}% · ${status}</div></div></a>`;};
-      html=`<div class="overview"><div class="ov-h"><span>今日一覽 · 點一場看詳細</span><span class="ov-h-lead">數據王</span><span>預測</span></div>${ovRows.map(rowH).join('')}</div>`+html;
+      html=`<div class="overview"><div class="ov-h"><span>今日一覽 · 點一場看詳細</span><span class="ov-h-lead">數據王(未開打為本季場均)</span><span>預測</span></div>${ovRows.map(rowH).join('')}</div>`+html;
     }
     /* 重畫前記住:畫面上方第一張比賽卡的位置、展開中的對戰紀錄與預測理由;重畫後還原,畫面不跳 */
     const keep=quiet?captureView():null;
