@@ -514,6 +514,29 @@
     table.autolearn td:nth-child(2){font-weight:700;color:var(--chalk)}
   }
   .date-note{font-size:12px;color:var(--muted);margin:0 0 8px}
+  /* 一覽中間:數據王 */
+  .overview .ov-h,.overview .ov-row{grid-template-columns:minmax(0,1fr) auto!important}
+  .ov-lead{display:none}
+  .ov-h-lead{display:none}
+  @media (min-width:900px){
+    .overview .ov-h,.overview .ov-row{grid-template-columns:minmax(0,1.05fr) minmax(0,1.25fr) auto!important}
+    .ov-h-lead{display:block;text-align:left}
+    .ov-lead{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 14px;align-items:center;border-left:1px solid var(--line);padding-left:14px;position:relative}
+    .ov-lead-t{position:absolute;top:-2px;right:0;font-size:10.5px;color:var(--muted)}
+    .ov-ld{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:13px;white-space:nowrap}
+    .ov-ld i{font-style:normal;font-size:11px;color:var(--muted);flex:0 0 auto}
+    .ov-ld b{font-weight:600;color:var(--chalk);overflow:hidden;text-overflow:ellipsis;min-width:0}
+    .ov-ld em{font-style:normal;font-family:var(--mono);font-weight:700;color:var(--teal);margin-left:auto}
+    .ov-ld.to em{color:var(--miss)}
+  }
+  @media (max-width:899px){
+    .ov-teams{order:1} .ov-pred{order:2}
+    .ov-lead{order:3;display:flex;flex-wrap:wrap;gap:2px 10px;grid-column:1/-1;font-size:11.5px;color:var(--muted);margin-top:-2px}
+    .ov-lead-t{font-size:11px;color:var(--muted)}
+    .ov-ld{white-space:nowrap} .ov-ld i{font-style:normal;margin-right:3px} .ov-ld b{font-weight:600;color:var(--ink2)} .ov-ld em{font-style:normal;font-family:var(--mono);font-weight:700;color:var(--teal);margin-left:3px}
+    .ov-ld.to em{color:var(--miss)}
+  }
+
   /* ---------- v3.13 視覺整理:記分板統計列 + 安靜的卡片 ---------- */
   /* 唯一大膽的元素:頁首統計做成球館記分板(深底、亮色數字) */
   #statRow{background:#14203a;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);border-radius:12px;padding:12px 16px 10px;margin-top:12px;gap:8px 24px!important;align-items:center!important}
@@ -655,7 +678,7 @@
     </section>
   </div>
 
-  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.13.2 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
+  <footer id="foot">模型說明載入中…<br>NBA 預測計分板 v3.14.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告</footer>
 </div>
 
 <script src="scripts/game-context.js?v=1"></script>
@@ -1672,6 +1695,39 @@ function keyOuts(tid){
   return (INJ[tid]||[]).map(x=>{const pd=PDB.players&&PDB.players[x.id];return {n:x.name,st:String(x.status||''),pts:pd&&pd.pts!=null?+pd.pts:(+x.pts||0),min:pd&&pd.min!=null?+pd.min:0};})
     .filter(x=>/out|suspen|doubt/i.test(x.st)&&(x.pts>=8||x.min>=18)).sort((a,b)=>b.pts-a.pts);
 }
+
+/* ---------- 各場數據王(得分、籃板、助攻、失誤):比賽中與賽後用本場 box score 即時統計,開打前用本季場均 ---------- */
+const LEAD_CACHE={};   /* gid → {ts,final,v} */
+const LEAD_CATS=[['PTS','得分'],['REB','籃板'],['AST','助攻'],['TO','失誤']];
+function parseLeaders(d){
+  const hc=((d.header||{}).competitions||[])[0]||{},hC=(hc.competitors||[]).find(x=>x.homeAway==='home');const homeId=hC&&hC.team?+hC.team.id:0;
+  const all=[];
+  ((d.boxscore||{}).players||[]).forEach(tp=>{const tid=+(tp.team?.id||0);const st=(tp.statistics||[])[0];if(!st)return;const lb=st.labels||st.names||[];
+    const ix=Object.fromEntries(LEAD_CATS.map(([k])=>[k,lb.indexOf(k)]));
+    (st.athletes||[]).forEach(a=>{if(!a.athlete||a.didNotPlay||!(a.stats||[]).length)return;const r={id:+a.athlete.id,n:a.athlete.shortName||a.athlete.displayName,home:tid===homeId};
+      for(const [k] of LEAD_CATS)r[k]=ix[k]>=0?(+a.stats[ix[k]]||0):0;all.push(r);});});
+  if(!all.length)return null;
+  const out={};for(const [k] of LEAD_CATS){const top=all.slice().sort((x,y)=>y[k]-x[k])[0];if(top&&top[k]>0)out[k]={n:top.n,v:top[k],home:top.home,id:top.id};}
+  return out;
+}
+async function refreshLeaders(games){
+  const need=games.filter(g=>(g.status==='Live'||g.status==='Final')&&!(LEAD_CACHE[g.id]&&(LEAD_CACHE[g.id].final||Date.now()-LEAD_CACHE[g.id].ts<40000)));
+  await Promise.allSettled(need.map(async g=>{try{const d=await jget(`${SB}/summary?event=${g.id}`);const v=parseLeaders(d);if(v)LEAD_CACHE[g.id]={ts:Date.now(),final:g.status==='Final',v};}catch(e){}}));
+}
+function seasonLeaders(g){
+  const ps=Object.entries(PDB.players||{}).filter(([id,p])=>(+p.tid===+g.homeId||+p.tid===+g.awayId)&&(p.gp||0)>=3&&!(INJ_READY&&keyOutIds(p.tid).has(+id)));
+  if(!ps.length)return null;const out={},key={PTS:'pts',REB:'reb',AST:'ast',TO:'to'};
+  for(const [k] of LEAD_CATS){const top=ps.slice().sort((a,b)=>(+b[1][key[k]]||0)-(+a[1][key[k]]||0))[0];if(top)out[k]={n:top[1].n,v:+top[1][key[k]]||0,home:+top[1].tid===+g.homeId,id:+top[0]};}
+  return out;
+}
+function keyOutIds(tid){return new Set((INJ[tid]||[]).filter(x=>/out|suspen|doubt/i.test(String(x.status||''))).map(x=>+x.id));}
+function leadersHtml(g){
+  const live=g.status==='Live'||g.status==='Final',c=LEAD_CACHE[g.id];const L=live?(c&&c.v):seasonLeaders(g);
+  if(!L)return live?'<div class="ov-lead"><span class="ov-lead-t">數據王讀取中…</span></div>':'';
+  const last=n=>{const a=String(n||'').split(' ');return a.length>1?a.slice(1).join(' '):n;};
+  const cell=([k,zh])=>{const x=L[k];if(!x)return '';return `<span class="ov-ld${k==='TO'?' to':''}"><i>${zh}</i><b>${esc(last(x.n))}</b><em>${live?x.v:(+x.v).toFixed(1)}</em></span>`;};
+  return `<div class="ov-lead"><span class="ov-lead-t">${g.status==='Live'?'<span class="ov-live">● 本場</span>':g.status==='Final'?'本場':'本季場均'}</span>${LEAD_CATS.map(cell).join('')}</div>`;
+}
 function absentHtml(g,date){
   if(!INJ_READY||!date||date<etToday())return '';
   const row=(tid,nm)=>{
@@ -1933,6 +1989,7 @@ async function loadDay(quiet){
     else games.sort((a,b)=>wgt(a)-wgt(b));
     GAME_ORDER={date,ids:games.map(g=>String(g.id))};
     let hits=0,finals=0,errSum=0,errN=0,fulls=0,mbN=0,frozenFinals=0,html='';
+    if(!window.__CLOUD_BUILD&&games.some(g=>g.status==='Live'||g.status==='Final')){const lp=refreshLeaders(games);await Promise.race([lp,new Promise(r=>setTimeout(r,2500))]);}
     const reviews=[],ovRows=[];curGames=games;curPreds=[];
     games.forEach(g=>{
       const A=pm[g.awayId],H=pm[g.homeId];
@@ -1966,9 +2023,9 @@ async function loadDay(quiet){
         const status=isF?act+(rv?(rv.mbHit?'<span class="ov-r full">★ 全中</span>':rv.hit?'<span class="ov-r hit">命中</span>':'<span class="ov-r miss">未中</span>'):'<span class="ov-t">終場</span>')
           :isL?`<span class="ov-live">● 進行中</span>`:`<span class="ov-t">${esc((g.startTpe||'').split(' ')[1]||'')} 開賽</span>`;
         return `<a class="ov-row" href="#g-${g.id}" data-jump="${g.id}">
-          <div class="ov-teams">${line(g.away,g.awayId,g.awayAbbr,g.awayScore,!favHome,'客')}${line(g.home,g.homeId,g.homeAbbr,g.homeScore,favHome,'主')}</div>
+          <div class="ov-teams">${line(g.away,g.awayId,g.awayAbbr,g.awayScore,!favHome,'客')}${line(g.home,g.homeId,g.homeAbbr,g.homeScore,favHome,'主')}</div>${leadersHtml(g)}
           <div class="ov-pred"><div class="ov-call"><b>${tm(fav)}</b> 贏${p.mb!=null?` <em class="ov-bk">${MB_NAMES[p.mb%6]}</em> 分`:''}</div><div class="ov-meta">勝率 ${pct}% · ${status}</div></div></a>`;};
-      html=`<div class="overview"><div class="ov-h"><span>今日一覽 · 點一場看詳細</span><span>預測</span></div>${ovRows.map(rowH).join('')}</div>`+html;
+      html=`<div class="overview"><div class="ov-h"><span>今日一覽 · 點一場看詳細</span><span class="ov-h-lead">數據王</span><span>預測</span></div>${ovRows.map(rowH).join('')}</div>`+html;
     }
     /* 重畫前記住:畫面上方第一張比賽卡的位置、展開中的對戰紀錄與預測理由;重畫後還原,畫面不跳 */
     const keep=quiet?captureView():null;
@@ -2601,7 +2658,7 @@ function renderFooter(){
   ].filter(Boolean);
   if(qualityOn)parts.unshift('正式點分差:對手校正實力評分，三分與罰球偶然波動收縮；每季只依更早三季選模，再用之前四季學係數。傷兵另外修正，未重複套用基準 K 與季內乘數');
   const cloud=CLOUD?`雲端校準:GitHub Actions 每天在雲端直接執行本頁模型(排程涵蓋台灣早上、下午與晚間，實際執行可能延遲),回補紀錄簿、重新學習參數、擬合 K/σ/缺陣係數並更新球員資料庫;紀錄簿 ${hh.games??'-'} 場(${hh.seasonsN??'-'} 個賽季,1994-95 季起,含每場兩隊上場球員數據)、球員資料庫 ${hh.pdb??'-'} 人;最近更新 ${upd||'-'}${cloudFresh()?'':'(已逾 36 小時,K/σ 暫由本機微調)'}。`:'雲端校準檔尚未讀到,暫用本機參數。';
-  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.13.2 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
+  el.innerHTML=`<details class="footmore"><summary>模型怎麼算、資料從哪來(點開看完整說明)</summary><p>${esc(parts.join(';'))}。</p><p>${esc(cloud)}戰績與近況回看任何日期時皆取「該日之前」,回測不偷看未來;歷史預測一經寫入即凍結。</p></details>NBA 單場波動大,此頁僅供興趣追蹤,非投注建議。${upd?`<br>雲端最近更新 ${esc(upd)}`:''}<br>NBA 預測計分板 v3.14.0 · 資料來源:ESPN 公開 API、NBA 官方傷兵報告`;
 }
 function calibHist(){if(cloudFresh()&&CLOUD.hist)return CLOUD.hist;try{return JSON.parse(storage.getItem('nba_calib_hist'))||[]}catch(e){return[]}}
 function pushCalibHist(rec){const h=calibHist();h.push(rec);while(h.length>60)h.shift();
