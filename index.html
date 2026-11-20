@@ -1744,7 +1744,8 @@ function seasonLeaders(g){
 }
 function keyOutIds(tid){return new Set((INJ[tid]||[]).filter(x=>/out|suspen|doubt/i.test(String(x.status||''))).map(x=>+x.id));}
 function leadersHtml(g){
-  const live=g.status==='Live'||g.status==='Final',c=LEAD_CACHE[g.id];const L=live?(c&&c.v):seasonLeaders(g);
+  const live=g.status==='Live'||g.status==='Final',c=LEAD_CACHE[g.id];let L=live?(c&&c.v):seasonLeaders(g);
+  if(live&&L&&!Object.keys(L).length)return '<div class="ov-lead is-live"><span class="ov-lead-t"><span class="ov-live">● 剛開打</span>,有人得分後就會出現</span></div>';
   if(!L)return live?'<div class="ov-lead"><span class="ov-lead-t">數據王讀取中…</span></div>':'';
   const last=n=>{const a=String(n||'').split(' ');return a.length>1?a.slice(1).join(' '):n;};
   const cell=([k,zh])=>{const x=L[k];if(!x)return '';return `<span class="ov-ld${k==='TO'?' to':''}"><i>${zh}</i><b>${esc(last(x.n))}</b><em>${live?x.v:(+x.v).toFixed(1)}</em></span>`;};
@@ -1755,7 +1756,8 @@ const CARD_CATS=[['PTS','得分','pts'],['REB','籃板','reb'],['AST','助攻','
 function cardLeadersHtml(g){
   const live=g.status==='Live'||g.status==='Final',c=LEAD_CACHE[g.id];
   let sides=null;
-  if(live){if(!c||!c.box)return '';sides={a:c.box.a,h:c.box.h};}
+  if(live){if(!c||!c.box)return '';sides={a:c.box.a,h:c.box.h};
+    if(![...sides.a,...sides.h].some(x=>x.PTS||x.REB||x.AST))return `<div class="cardlead"><div class="cl-title"><span class="ov-live">● 本場即時數據王</span> <small>比賽剛開打,有人得分後就會出現</small></div></div>`;}
   else{const pick=tid=>Object.entries(PDB.players||{}).filter(([id,p])=>+p.tid===+tid&&(p.gp||0)>=3&&!(INJ_READY&&keyOutIds(tid).has(+id)))
         .map(([id,p])=>({id:+id,n:p.n,PTS:+p.pts||0,REB:+p.reb||0,AST:+p.ast||0,STL:+p.stl||0,BLK:+p.blk||0,TO:+p.to||0,MIN:+p.min||0}));
     sides={a:pick(g.awayId),h:pick(g.homeId)};if(!sides.a.length&&!sides.h.length)return '';}
@@ -1770,7 +1772,7 @@ function cardLeadersHtml(g){
   let stars='';
   if(live){const line=x=>`<span class="cl-s"><b data-pid="${x.id}">${esc(x.n)}</b> ${x.PTS} 分 ${x.REB} 板 ${x.AST} 助${x.STL?` ${x.STL} 抄`:''}${x.BLK?` ${x.BLK} 阻`:''} · ${x.MIN} 分鐘${x.PM?` · 正負 ${x.PM>0?'+':''}${x.PM}`:''}</span>`;
     const best=arr=>arr.slice().sort((x,y)=>(y.PTS+1.2*y.REB+1.5*y.AST+2*y.STL+2*y.BLK-y.TO)-(x.PTS+1.2*x.REB+1.5*x.AST+2*x.STL+2*x.BLK-x.TO))[0];
-    const ba=best(sides.a),bh=best(sides.h);stars=`<div class="cl-stars">${ba?`<div><i>${esc(shortTeam(g.away))} 最佳</i>${line(ba)}</div>`:''}${bh?`<div><i>${esc(shortTeam(g.home))} 最佳</i>${line(bh)}</div>`:''}</div>`;}
+    const ok=x=>x&&(x.PTS||x.REB||x.AST);const ba0=best(sides.a),bh0=best(sides.h),ba=ok(ba0)?ba0:null,bh=ok(bh0)?bh0:null;stars=`<div class="cl-stars">${ba?`<div><i>${esc(shortTeam(g.away))} 最佳</i>${line(ba)}</div>`:''}${bh?`<div><i>${esc(shortTeam(g.home))} 最佳</i>${line(bh)}</div>`:''}</div>`;}
   return `<div class="cardlead"><div class="cl-title">${g.status==='Live'?'<span class="ov-live">● 本場即時數據王</span>':g.status==='Final'?'本場數據王':'數據王 <small>本季場均,已排除確定不打的球員</small>'}</div><div class="cl-h"><span></span><span class="cl-t">${esc(shortTeam(g.away))}</span><span class="cl-t">${esc(shortTeam(g.home))}</span></div>${rows}${stars}</div>`;
 }
 function absentHtml(g,date){
